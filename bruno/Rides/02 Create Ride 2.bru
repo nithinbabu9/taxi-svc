@@ -1,0 +1,41 @@
+meta {
+  name: Create Ride 2 - Arlington Heights to Chicago
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/rides
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "userId": "{{user2Id}}",
+    "pickupAddress": "Arlington Heights, IL",
+    "destinationAddress": "Millennium Park, Chicago, IL",
+    "departureTime": "{{departureTime}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar("departureTime", new Date(Date.now() + 24 * 60 * 60 * 1000 + 10 * 60 * 1000).toISOString());
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setEnvVar("ride2Id", res.body.id);
+  }
+}
+
+tests {
+  test("Ride 2 is created", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.id).to.be.a("string");
+  });
+}

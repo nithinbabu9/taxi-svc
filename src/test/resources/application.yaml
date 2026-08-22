@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:taxi;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  ai:
+    anthropic:
+      api-key: test-key-not-used
+
+app:
+  google-maps:
+    api-key: test-key-not-used
+    geocoding-base-url: https://geocode.test
+    routes-base-url: https://routes.test
+    connect-timeout: 1s
+    read-timeout: 1s
+  matching:
+    maximum-pickup-deviation-meters: 10000
+    maximum-destination-deviation-meters: 10000
+    maximum-route-pickup-deviation-meters: 5000
+    maximum-departure-time-difference: 30m
+    route-overlap-tolerance-meters: 2000
+    minimum-route-overlap: 0.25
+    minimum-match-score: 0.55
+    pickup-weight: 0.25
+    destination-weight: 0.30
+    route-overlap-weight: 0.30
+    departure-time-weight: 0.15

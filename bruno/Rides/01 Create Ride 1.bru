@@ -1,0 +1,41 @@
+meta {
+  name: Create Ride 1 - Schaumburg to Chicago
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/rides
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "userId": "{{user1Id}}",
+    "pickupAddress": "Schaumburg, IL",
+    "destinationAddress": "Millennium Park, Chicago, IL",
+    "departureTime": "{{departureTime}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar("departureTime", new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+}
+
+script:post-response {
+  if (res.status === 201) {
+    bru.setEnvVar("ride1Id", res.body.id);
+  }
+}
+
+tests {
+  test("Ride 1 is created", function () {
+    expect(res.status).to.equal(201);
+    expect(res.body.id).to.be.a("string");
+  });
+}

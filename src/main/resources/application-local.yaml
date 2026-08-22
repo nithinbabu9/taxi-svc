@@ -1,0 +1,12 @@
+# Offline development profile. Map results are deterministic fixtures, not real navigation data.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/taxi}
+    username: ${DATABASE_USERNAME:nithin}
+    password: ${DATABASE_PASSWORD:}
+
+app:
+  matching:
+    # Offline routes are straight-line fixtures and naturally have less overlap than road geometry.
+    minimum-route-overlap: 0.20
+    minimum-match-score: 0.50

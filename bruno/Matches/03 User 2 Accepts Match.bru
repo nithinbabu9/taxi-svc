@@ -1,0 +1,35 @@
+meta {
+  name: User 2 Accepts Match and Creates Chat
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/matches/{{matchId}}/accept
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "userId": "{{user2Id}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body.chatId) {
+    bru.setEnvVar("chatId", res.body.chatId);
+  }
+}
+
+tests {
+  test("Match is accepted and chat is created", function () {
+    expect(res.status).to.equal(200);
+    expect(res.body.status).to.equal("ACCEPTED");
+    expect(res.body.chatId).to.be.a("string");
+  });
+}

@@ -1,0 +1,11 @@
+meta {
+  name: Get Messages
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/chats/{{chatId}}/messages?page=0&size=50
+  body: none
+  auth: none
+}

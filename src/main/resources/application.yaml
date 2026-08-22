@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: taxi
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/taxi}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+server:
+  error:
+    include-message: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    display-request-duration: true
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+
+logging:
+  level:
+    uber.taxi: INFO
+
+app:
+  google-maps:
+    api-key: ${GOOGLE_MAPS_API_KEY}
+    geocoding-base-url: https://geocode.googleapis.com
+    routes-base-url: https://routes.googleapis.com
+    connect-timeout: 3s
+    read-timeout: 8s
+  matching:
+    maximum-pickup-deviation-meters: 15000
+    maximum-destination-deviation-meters: 10000
+    maximum-route-pickup-deviation-meters: 10000
+    maximum-departure-time-difference: 30m
+    route-overlap-tolerance-meters: 2000
+    minimum-route-overlap: 0.25
+    minimum-match-score: 0.55
+    pickup-weight: 0.25
+    destination-weight: 0.30
+    route-overlap-weight: 0.30
+    departure-time-weight: 0.15

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Taxi ride matching local test interface">
+  <title>Wayfare — Share the road</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Wayfare home">
+      <span class="brand-mark">
+        <svg viewBox="0 0 42 42" aria-hidden="true"><path d="M9 27c7-1 8-13 14-13 5 0 5 8 10 8"/><circle cx="9" cy="27" r="3"/><circle cx="33" cy="22" r="3"/></svg>
+      </span>
+      <span>wayfare</span>
+    </a>
+    <nav>
+      <a href="#rides">Rides</a>
+      <a href="#matches">Matches</a>
+      <a href="#chat">Chat</a>
+    </nav>
+    <div class="status-pill"><span id="statusDot"></span><span id="apiStatus">Checking API</span></div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span></span> LOCAL RIDE-MATCHING LAB</div>
+        <h1>Same direction.<br><em>Better journey.</em></h1>
+        <p>Create two travelers, plan nearby trips, and watch the matching engine bring them together—all from one thoughtful workspace.</p>
+        <div class="hero-actions">
+          <a class="button primary" href="#travelers">Start a test ride <span>→</span></a>
+          <!--suppress HtmlUnknownTarget -->
+          <a class="button ghost" href="/swagger-ui.html" target="_blank" rel="noopener">Explore API</a>
+        </div>
+        <div class="hero-stats">
+          <div><strong>4</strong><span>match signals</span></div>
+          <div><strong>30m</strong><span>time window</span></div>
+          <div><strong>1</strong><span>private chat</span></div>
+        </div>
+      </div>
+      <div class="route-visual" aria-label="Illustrated route between Schaumburg and Chicago">
+        <div class="map-grid"></div>
+        <div class="route-label origin"><span></span><div><small>PICKUP</small><strong>Schaumburg</strong></div></div>
+        <div class="route-label destination"><span></span><div><small>DESTINATION</small><strong>Chicago</strong></div></div>
+        <svg class="route-line" viewBox="0 0 500 500" fill="none" aria-hidden="true">
+          <path class="route-shadow" d="M90 375C145 315 123 228 205 202C285 177 291 91 413 112"/>
+          <path class="route-path" d="M90 375C145 315 123 228 205 202C285 177 291 91 413 112"/>
+        </svg>
+        <div class="car">↗</div>
+        <div class="route-card"><span class="mini-icon">⌁</span><div><small>ESTIMATED ROUTE</small><strong>49.1 km <i>•</i> 46 min</strong></div></div>
+      </div>
+    </section>
+
+    <section class="workspace" id="travelers">
+      <div class="section-heading">
+        <div><span class="step-number">01</span><h2>Create your travelers</h2></div>
+        <p>Use unique emails each time. IDs are saved in this browser automatically.</p>
+      </div>
+      <div class="two-column">
+        <form class="panel traveler-panel" id="user1Form">
+          <div class="panel-top"><div class="avatar coral">A</div><div><small>TRAVELER ONE</small><h3>Primary rider</h3></div><span class="saved-badge" id="user1Badge">Not created</span></div>
+          <div class="form-grid">
+            <label>First name<input name="firstName" value="Nithin" required maxlength="100"></label>
+            <label>Last name<input name="lastName" value="User" required maxlength="100"></label>
+            <label class="wide">Email<input name="email" type="email" data-dynamic-email="nithin" required></label>
+            <label class="wide">Phone<input name="phoneNumber" value="+1 312-555-0101"></label>
+          </div>
+          <button class="button dark full" type="submit">Create or use traveler A <span>→</span></button>
+        </form>
+        <form class="panel traveler-panel" id="user2Form">
+          <div class="panel-top"><div class="avatar teal">B</div><div><small>TRAVELER TWO</small><h3>Potential match</h3></div><span class="saved-badge" id="user2Badge">Not created</span></div>
+          <div class="form-grid">
+            <label>First name<input name="firstName" value="John" required maxlength="100"></label>
+            <label>Last name<input name="lastName" value="Doe" required maxlength="100"></label>
+            <label class="wide">Email<input name="email" type="email" data-dynamic-email="john" required></label>
+            <label class="wide">Phone<input name="phoneNumber" value="+1 847-555-0102"></label>
+          </div>
+          <button class="button dark full" type="submit">Create or use traveler B <span>→</span></button>
+        </form>
+      </div>
+    </section>
+
+    <section class="workspace tinted" id="rides">
+      <div class="section-heading">
+        <div><span class="step-number">02</span><h2>Plan compatible rides</h2></div>
+        <div class="heading-actions"><p>The local profile resolves fixture coordinates and calculates an offline route.</p><button class="button ghost compact" id="newBooking" type="button">Start another booking</button></div>
+      </div>
+      <div class="two-column">
+        <form class="panel ride-panel" id="ride1Form">
+          <div class="route-title"><span class="route-dot coral"></span><h3>Traveler A's trip</h3><span class="saved-badge" id="ride1Badge">Waiting</span></div>
+          <label>Pickup address<input name="pickupAddress" value="Schaumburg, IL" required></label>
+          <div class="connector"></div>
+          <label>Destination<input name="destinationAddress" value="Millennium Park, Chicago, IL" required></label>
+          <label>Departure time<input name="departureTime" type="datetime-local" required></label>
+          <button class="button primary full" type="submit">Create ride A</button>
+        </form>
+        <form class="panel ride-panel" id="ride2Form">
+          <div class="route-title"><span class="route-dot teal"></span><h3>Traveler B's trip</h3><span class="saved-badge" id="ride2Badge">Waiting</span></div>
+          <label>Pickup address<input name="pickupAddress" value="Arlington Heights, IL" required></label>
+          <div class="connector"></div>
+          <label>Destination<input name="destinationAddress" value="Millennium Park, Chicago, IL" required></label>
+          <label>Departure time<input name="departureTime" type="datetime-local" required></label>
+          <button class="button primary full" type="submit">Create ride B & find match</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="workspace" id="matches">
+      <div class="section-heading">
+        <div><span class="step-number">03</span><h2>Review the match</h2></div>
+        <button class="button ghost compact" id="refreshMatches" type="button">Refresh matches</button>
+      </div>
+      <div id="matchEmpty" class="empty-state">
+        <div class="empty-orbit"><span>⌁</span></div>
+        <h3>No match loaded yet</h3>
+        <p>Create both rides, then refresh to see compatibility details.</p>
+      </div>
+      <article id="matchCard" class="match-card hidden">
+        <div class="match-people">
+          <div class="avatar coral large">A</div><div class="match-line"><span></span><div>compatible route</div></div><div class="avatar teal large">B</div>
+        </div>
+        <div class="score-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52"/><circle id="scoreCircle" class="progress" cx="60" cy="60" r="52"/></svg><div><strong id="matchScore">0%</strong><span>MATCH</span></div></div>
+        <div class="metrics">
+          <div><span>Pickup gap</span><strong id="pickupDistance">—</strong></div>
+          <div><span>Destination gap</span><strong id="destinationDistance">—</strong></div>
+          <div><span>Route overlap</span><strong id="routeSimilarity">—</strong></div>
+          <div><span>Time difference</span><strong id="timeDifference">—</strong></div>
+        </div>
+        <div class="acceptance">
+          <button class="button dark" id="acceptUser1" type="button">Traveler A accepts</button>
+          <button class="button dark" id="acceptUser2" type="button">Traveler B accepts</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="workspace chat-section" id="chat">
+      <div class="section-heading light">
+        <div><span class="step-number">04</span><h2>Coordinate the journey</h2></div>
+        <span class="chat-state" id="chatState"><i></i> Chat unlocks after both accept</span>
+      </div>
+      <div class="chat-shell">
+        <aside>
+          <div class="avatar-stack"><div class="avatar coral">A</div><div class="avatar teal">B</div></div>
+          <h3>Ride coordination</h3><p>Private conversation for this accepted match.</p>
+          <div class="chat-meta"><span>Chat ID</span><code id="chatIdText">Not created</code></div>
+        </aside>
+        <div class="conversation">
+          <div class="messages" id="messages"><div class="chat-placeholder"><span>✦</span><p>Your conversation will appear here.</p></div></div>
+          <form class="message-form" id="messageForm">
+            <select id="messageSender" aria-label="Message sender"><option value="user1Id">Traveler A</option><option value="user2Id">Traveler B</option></select>
+            <input id="messageText" aria-label="Message text" placeholder="Write a message…" maxlength="4000" required disabled>
+            <button type="submit" aria-label="Send message" disabled>↑</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="brand footer-brand"><span class="brand-mark">⌁</span><span>wayfare</span></div><p>Local experience powered by the Taxi Spring Boot API.</p><!--suppress HtmlUnknownTarget --><a href="/swagger-ui.html">API documentation ↗</a></footer>
+  <div class="toast" id="toast" role="status"><span></span><p></p></div>
+  <script src="/js/app.js" defer></script>
+</body>
+</html>

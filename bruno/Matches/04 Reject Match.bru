@@ -1,0 +1,21 @@
+meta {
+  name: Reject Match (Alternative Flow)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/matches/{{matchId}}/reject
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "userId": "{{user1Id}}"
+  }
+}

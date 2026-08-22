@@ -1,0 +1,28 @@
+meta {
+  name: Send Message as User 1
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/chats/{{chatId}}/messages
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "senderId": "{{user1Id}}",
+    "message": "See you at the pickup point"
+  }
+}
+
+tests {
+  test("Message is created", function () {
+    expect(res.status).to.equal(201);
+  });
+}
