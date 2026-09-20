@@ -28,14 +28,25 @@ public class User extends BaseEntity {
     @Column(length = 30)
     private String phoneNumber;
 
+    @Column(nullable = false, length = 100)
+    private String passwordHash;
+
+    @Column(nullable = false)
+    private boolean emailVerified;
+
     protected User() {
     }
 
-    public User(String firstName, String lastName, String email, String phoneNumber) {
+    public User(String firstName, String lastName, String email, String phoneNumber, String passwordHash) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
         this.phoneNumber = phoneNumber;
+        this.passwordHash = passwordHash;
+    }
+
+    public User(String firstName, String lastName, String email, String phoneNumber) {
+        this(firstName, lastName, email, phoneNumber, "!authentication-not-configured!");
     }
 
     public UUID getId() { return id; }
@@ -43,4 +54,7 @@ public class User extends BaseEntity {
     public String getLastName() { return lastName; }
     public String getEmail() { return email; }
     public String getPhoneNumber() { return phoneNumber; }
+    public String getPasswordHash() { return passwordHash; }
+    public boolean isEmailVerified() { return emailVerified; }
+    public void markEmailVerified() { this.emailVerified = true; }
 }

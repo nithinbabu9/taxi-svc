@@ -14,6 +14,7 @@ import uber.taxi.entity.RideRequest;
 import uber.taxi.entity.RideRequestStatus;
 import uber.taxi.entity.User;
 import uber.taxi.exception.ConflictException;
+import uber.taxi.exception.ForbiddenException;
 import uber.taxi.exception.InvalidRequestException;
 import uber.taxi.exception.RideRequestNotFoundException;
 import uber.taxi.mapper.RideMapper;
@@ -42,9 +43,9 @@ public class RideService {
     }
 
     @Transactional
-    public RideResponse create(CreateRideRequest request) {
+    public RideResponse create(UUID actorId, CreateRideRequest request) {
         validateDifferentLocations(request.pickupAddress(), request.destinationAddress());
-        User user = userService.findEntity(request.userId());
+        User user = userService.findEntity(actorId);
         ResolvedTrip trip = resolveTrip(request.pickupAddress(), request.destinationAddress(), request.departureTime());
         RideRequest ride = new RideRequest(user, request.pickupAddress().trim(),
                 request.destinationAddress().trim(), request.departureTime());
@@ -56,22 +57,22 @@ public class RideService {
     }
 
     @Transactional(readOnly = true)
-    public RideResponse get(UUID id) {
-        return rideMapper.toResponse(findEntity(id));
+    public RideResponse get(UUID actorId, UUID id) {
+        return rideMapper.toResponse(requireOwner(actorId, findEntity(id)));
     }
 
     @Transactional(readOnly = true)
-    public List<RideResponse> getForUser(UUID userId) {
-        userService.findEntity(userId);
-        return rideRepository.findByUserIdOrderByDepartureTimeDesc(userId).stream()
+    public List<RideResponse> getForUser(UUID actorId) {
+        userService.findEntity(actorId);
+        return rideRepository.findByUserIdOrderByDepartureTimeDesc(actorId).stream()
                 .map(rideMapper::toResponse)
                 .toList();
     }
 
     @Transactional
-    public RideResponse update(UUID id, UpdateRideRequest request) {
+    public RideResponse update(UUID actorId, UUID id, UpdateRideRequest request) {
         validateDifferentLocations(request.pickupAddress(), request.destinationAddress());
-        RideRequest ride = findEntity(id);
+        RideRequest ride = requireOwner(actorId, findEntity(id));
         requireOpen(ride, "updated");
         ResolvedTrip trip = resolveTrip(request.pickupAddress(), request.destinationAddress(), request.departureTime());
         ride.update(request.pickupAddress().trim(), request.destinationAddress().trim(), request.departureTime());
@@ -82,8 +83,8 @@ public class RideService {
     }
 
     @Transactional
-    public RideResponse cancel(UUID id) {
-        RideRequest ride = findEntity(id);
+    public RideResponse cancel(UUID actorId, UUID id) {
+        RideRequest ride = requireOwner(actorId, findEntity(id));
         requireOpen(ride, "cancelled");
         ride.cancel();
         matchingService.cancelPendingMatches(id);
@@ -93,6 +94,13 @@ public class RideService {
 
     private RideRequest findEntity(UUID id) {
         return rideRepository.findById(id).orElseThrow(() -> new RideRequestNotFoundException(id));
+    }
+
+    private RideRequest requireOwner(UUID actorId, RideRequest ride) {
+        if (!ride.getUser().getId().equals(actorId)) {
+            throw new ForbiddenException("You do not own this ride request");
+        }
+        return ride;
     }
 
     private void requireOpen(RideRequest ride, String operation) {

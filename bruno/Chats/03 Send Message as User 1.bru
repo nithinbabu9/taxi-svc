@@ -7,7 +7,11 @@ meta {
 post {
   url: {{baseUrl}}/api/chats/{{chatId}}/messages
   body: json
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user1Token}}
 }
 
 headers {
@@ -16,7 +20,6 @@ headers {
 
 body:json {
   {
-    "senderId": "{{user1Id}}",
     "message": "See you at the pickup point"
   }
 }

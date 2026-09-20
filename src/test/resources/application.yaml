@@ -1,4 +1,6 @@
 spring:
+  mail:
+    host: localhost
   datasource:
     url: jdbc:h2:mem:taxi;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
     username: sa
@@ -7,11 +9,16 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-  ai:
-    anthropic:
-      api-key: test-key-not-used
-
 app:
+  email-verification:
+    from: test@wayfare.test
+    code-lifetime: 10m
+    resend-cooldown: 1m
+    maximum-attempts: 5
+  security:
+    jwt:
+      secret: test-only-jwt-secret-at-least-thirty-two-bytes
+      lifetime: 1h
   google-maps:
     api-key: test-key-not-used
     geocoding-base-url: https://geocode.test

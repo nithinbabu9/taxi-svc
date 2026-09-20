@@ -24,7 +24,7 @@ import uber.taxi.entity.RideRequest;
 import uber.taxi.entity.ChatParticipant;
 import uber.taxi.entity.Message;
 import uber.taxi.entity.User;
-import uber.taxi.exception.InvalidRequestException;
+import uber.taxi.exception.ForbiddenException;
 import uber.taxi.repository.ChatParticipantRepository;
 import uber.taxi.repository.ChatRepository;
 import uber.taxi.repository.MessageRepository;
@@ -61,14 +61,12 @@ class ChatServiceTest {
         UUID chatId = UUID.randomUUID();
         UUID senderId = UUID.randomUUID();
         Chat chat = org.mockito.Mockito.mock(Chat.class);
-        User sender = new User("Test", "Sender", "sender@example.com", null);
-        setId(sender, senderId);
+        when(chat.getId()).thenReturn(chatId);
         when(chatRepository.findById(chatId)).thenReturn(Optional.of(chat));
-        when(userService.findEntity(senderId)).thenReturn(sender);
         when(participantRepository.existsByChatIdAndUserId(chatId, senderId)).thenReturn(false);
 
-        assertThrows(InvalidRequestException.class,
-                () -> service.sendMessage(chatId, new SendMessageRequest(senderId, "Hello")));
+        assertThrows(ForbiddenException.class,
+                () -> service.sendMessage(senderId, chatId, new SendMessageRequest("Hello")));
         verify(messageRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 
@@ -113,7 +111,7 @@ class ChatServiceTest {
         when(participantRepository.existsByChatIdAndUserId(chatId, senderId)).thenReturn(true);
         when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var response = service.sendMessage(chatId, new SendMessageRequest(senderId, "  Ready to leave?  "));
+        var response = service.sendMessage(senderId, chatId, new SendMessageRequest("  Ready to leave?  "));
 
         assertEquals("Ready to leave?", response.message());
         assertEquals(chatId, response.chatId());

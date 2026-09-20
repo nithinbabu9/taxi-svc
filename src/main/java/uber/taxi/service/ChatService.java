@@ -18,6 +18,7 @@ import uber.taxi.entity.RideMatch;
 import uber.taxi.entity.User;
 import uber.taxi.exception.ChatNotFoundException;
 import uber.taxi.exception.InvalidRequestException;
+import uber.taxi.exception.ForbiddenException;
 import uber.taxi.repository.ChatParticipantRepository;
 import uber.taxi.repository.ChatRepository;
 import uber.taxi.repository.MessageRepository;
@@ -52,29 +53,26 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
-    public ChatResponse get(UUID chatId) {
-        return toResponse(findChat(chatId));
+    public ChatResponse get(UUID actorId, UUID chatId) {
+        return toResponse(requireParticipant(actorId, findChat(chatId)));
     }
 
     @Transactional(readOnly = true)
-    public List<ChatResponse> getForUser(UUID userId) {
-        userService.findEntity(userId);
-        return chatRepository.findAllForUser(userId).stream().map(this::toResponse).toList();
+    public List<ChatResponse> getForUser(UUID actorId) {
+        userService.findEntity(actorId);
+        return chatRepository.findAllForUser(actorId).stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public Page<MessageResponse> getMessages(UUID chatId, Pageable pageable) {
-        findChat(chatId);
+    public Page<MessageResponse> getMessages(UUID actorId, UUID chatId, Pageable pageable) {
+        requireParticipant(actorId, findChat(chatId));
         return messageRepository.findByChatId(chatId, pageable).map(this::toMessageResponse);
     }
 
     @Transactional
-    public MessageResponse sendMessage(UUID chatId, SendMessageRequest request) {
-        Chat chat = findChat(chatId);
-        User sender = userService.findEntity(request.senderId());
-        if (!participantRepository.existsByChatIdAndUserId(chatId, sender.getId())) {
-            throw new InvalidRequestException("Sender is not a participant in this chat");
-        }
+    public MessageResponse sendMessage(UUID actorId, UUID chatId, SendMessageRequest request) {
+        Chat chat = requireParticipant(actorId, findChat(chatId));
+        User sender = userService.findEntity(actorId);
         Message message = messageRepository.save(new Message(chat, sender, request.message().trim()));
         log.info("Message sent with id {} in chat {}", message.getId(), chatId);
         return toMessageResponse(message);
@@ -82,6 +80,13 @@ public class ChatService {
 
     private Chat findChat(UUID chatId) {
         return chatRepository.findById(chatId).orElseThrow(() -> new ChatNotFoundException(chatId));
+    }
+
+    private Chat requireParticipant(UUID actorId, Chat chat) {
+        if (!participantRepository.existsByChatIdAndUserId(chat.getId(), actorId)) {
+            throw new ForbiddenException("You are not a participant in this chat");
+        }
+        return chat;
     }
 
     private ChatResponse toResponse(Chat chat) {

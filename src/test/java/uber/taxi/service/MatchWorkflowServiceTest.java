@@ -23,7 +23,7 @@ import uber.taxi.entity.RideMatchStatus;
 import uber.taxi.entity.RideRequest;
 import uber.taxi.entity.RideRequestStatus;
 import uber.taxi.entity.User;
-import uber.taxi.exception.InvalidRequestException;
+import uber.taxi.exception.ForbiddenException;
 import uber.taxi.repository.RideMatchRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -69,7 +69,7 @@ class MatchWorkflowServiceTest {
         RideMatch match = match(matchId, UUID.randomUUID(), UUID.randomUUID());
         when(matchRepository.findByIdForUpdate(matchId)).thenReturn(Optional.of(match));
 
-        assertThrows(InvalidRequestException.class, () -> service.accept(matchId, UUID.randomUUID()));
+        assertThrows(ForbiddenException.class, () -> service.accept(matchId, UUID.randomUUID()));
     }
 
     @Test

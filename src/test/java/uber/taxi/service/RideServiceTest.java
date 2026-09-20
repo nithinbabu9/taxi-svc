@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.time.Duration;
 import java.math.BigDecimal;
@@ -23,6 +24,7 @@ import uber.taxi.entity.RideRequest;
 import uber.taxi.entity.RideRequestStatus;
 import uber.taxi.entity.User;
 import uber.taxi.exception.ConflictException;
+import uber.taxi.exception.ForbiddenException;
 import uber.taxi.exception.InvalidRequestException;
 import uber.taxi.mapper.RideMapper;
 import uber.taxi.repository.RideRequestRepository;
@@ -53,18 +55,19 @@ class RideServiceTest {
 
     @Test
     void rejectsEffectivelyIdenticalLocationsBeforeSaving() {
-        CreateRideRequest request = new CreateRideRequest(UUID.randomUUID(), " Chicago ", "chicago",
+        CreateRideRequest request = new CreateRideRequest(" Chicago ", "chicago",
                 Instant.now().plus(1, ChronoUnit.DAYS));
 
-        assertThrows(InvalidRequestException.class, () -> rideService.create(request));
+        assertThrows(InvalidRequestException.class, () -> rideService.create(UUID.randomUUID(), request));
         verify(rideRepository, never()).save(any());
     }
 
     @Test
-    void createsRideFromServerResolvedLocationsAndRoute() {
+    void createsRideFromServerResolvedLocationsAndRoute() throws Exception {
         UUID userId = UUID.randomUUID();
         Instant departure = Instant.now().plus(1, ChronoUnit.DAYS);
         User user = new User("Test", "Person", "person@example.com", null);
+        setId(user, userId);
         GeocodedLocation pickup = new GeocodedLocation("Schaumburg, IL, USA", "pickup-place",
                 new BigDecimal("42.0334"), new BigDecimal("-88.0834"));
         GeocodedLocation destination = new GeocodedLocation("Chicago, IL, USA", "destination-place",
@@ -76,8 +79,8 @@ class RideServiceTest {
                 .thenReturn(new RouteDetails(48_000, Duration.ofMinutes(45), "polyline"));
         when(rideRepository.save(any(RideRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RideResponse response = rideService.create(
-                new CreateRideRequest(userId, "Schaumburg, IL", "Chicago, IL", departure));
+        RideResponse response = rideService.create(userId,
+                new CreateRideRequest("Schaumburg, IL", "Chicago, IL", departure));
 
         assertEquals("Schaumburg, IL, USA", response.pickupAddress());
         assertEquals("pickup-place", response.pickupPlaceId());
@@ -86,34 +89,43 @@ class RideServiceTest {
     }
 
     @Test
-    void cancellationChangesStatusInsteadOfDeleting() {
+    void cancellationChangesStatusInsteadOfDeleting() throws Exception {
         UUID rideId = UUID.randomUUID();
-        RideRequest ride = new RideRequest(new User("Test", "Person", "person@example.com", null),
+        UUID actorId = UUID.randomUUID();
+        User user = new User("Test", "Person", "person@example.com", null);
+        setId(user, actorId);
+        RideRequest ride = new RideRequest(user,
                 "Schaumburg, IL", "Chicago, IL", Instant.now().plus(1, ChronoUnit.DAYS));
         when(rideRepository.findById(rideId)).thenReturn(Optional.of(ride));
 
-        rideService.cancel(rideId);
+        rideService.cancel(actorId, rideId);
 
         assertEquals(RideRequestStatus.CANCELLED, ride.getStatus());
         verify(rideRepository, never()).delete(any());
     }
 
     @Test
-    void cannotCancelRideTwice() {
+    void cannotCancelRideTwice() throws Exception {
         UUID rideId = UUID.randomUUID();
-        RideRequest ride = new RideRequest(new User("Test", "Person", "person@example.com", null),
+        UUID actorId = UUID.randomUUID();
+        User user = new User("Test", "Person", "person@example.com", null);
+        setId(user, actorId);
+        RideRequest ride = new RideRequest(user,
                 "Schaumburg, IL", "Chicago, IL", Instant.now().plus(1, ChronoUnit.DAYS));
         ride.cancel();
         when(rideRepository.findById(rideId)).thenReturn(Optional.of(ride));
 
-        assertThrows(ConflictException.class, () -> rideService.cancel(rideId));
+        assertThrows(ConflictException.class, () -> rideService.cancel(actorId, rideId));
     }
 
     @Test
-    void updateReplacesResolvedRouteAndRefreshesMatches() {
+    void updateReplacesResolvedRouteAndRefreshesMatches() throws Exception {
         UUID rideId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
         Instant departure = Instant.now().plus(2, ChronoUnit.DAYS);
-        RideRequest ride = new RideRequest(new User("Test", "Person", "person@example.com", null),
+        User user = new User("Test", "Person", "person@example.com", null);
+        setId(user, actorId);
+        RideRequest ride = new RideRequest(user,
                 "Old pickup", "Old destination", departure.minus(1, ChronoUnit.DAYS));
         GeocodedLocation pickup = new GeocodedLocation("Evanston, IL", "evanston",
                 new BigDecimal("42.0451"), new BigDecimal("-87.6877"));
@@ -125,7 +137,7 @@ class RideServiceTest {
         when(mapsClient.computeDrivingRoute(pickup, destination, departure))
                 .thenReturn(new RouteDetails(130_000, Duration.ofMinutes(80), "updated-polyline"));
 
-        RideResponse response = rideService.update(rideId,
+        RideResponse response = rideService.update(actorId, rideId,
                 new UpdateRideRequest(" Evanston, IL ", " Milwaukee, WI ", departure));
 
         assertEquals("Evanston, IL", response.pickupAddress());
@@ -135,15 +147,38 @@ class RideServiceTest {
     }
 
     @Test
-    void matchedRideCannotBeUpdated() {
+    void matchedRideCannotBeUpdated() throws Exception {
         UUID rideId = UUID.randomUUID();
-        RideRequest ride = new RideRequest(new User("Test", "Person", "person@example.com", null),
+        UUID actorId = UUID.randomUUID();
+        User user = new User("Test", "Person", "person@example.com", null);
+        setId(user, actorId);
+        RideRequest ride = new RideRequest(user,
                 "Pickup", "Destination", Instant.now().plus(1, ChronoUnit.DAYS));
         ride.markMatched();
         when(rideRepository.findById(rideId)).thenReturn(Optional.of(ride));
 
-        assertThrows(ConflictException.class, () -> rideService.update(rideId,
+        assertThrows(ConflictException.class, () -> rideService.update(actorId, rideId,
                 new UpdateRideRequest("New pickup", "New destination", Instant.now().plus(2, ChronoUnit.DAYS))));
         verify(mapsClient, never()).geocode(any());
+    }
+
+    @Test
+    void preventsAnotherUserFromCancellingARide() throws Exception {
+        UUID rideId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        User owner = new User("Owner", "User", "owner@example.com", null);
+        setId(owner, ownerId);
+        RideRequest ride = new RideRequest(owner, "Schaumburg, IL", "Chicago, IL",
+                Instant.now().plus(1, ChronoUnit.DAYS));
+        when(rideRepository.findById(rideId)).thenReturn(Optional.of(ride));
+
+        assertThrows(ForbiddenException.class, () -> rideService.cancel(UUID.randomUUID(), rideId));
+        assertEquals(RideRequestStatus.OPEN, ride.getStatus());
+    }
+
+    private void setId(Object target, UUID id) throws Exception {
+        Field field = target.getClass().getDeclaredField("id");
+        field.setAccessible(true);
+        field.set(target, id);
     }
 }

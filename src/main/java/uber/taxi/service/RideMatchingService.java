@@ -15,6 +15,7 @@ import uber.taxi.entity.RideMatchStatus;
 import uber.taxi.entity.RideRequest;
 import uber.taxi.entity.RideRequestStatus;
 import uber.taxi.exception.RideRequestNotFoundException;
+import uber.taxi.exception.ForbiddenException;
 import uber.taxi.mapper.RideMatchMapper;
 import uber.taxi.repository.RideMatchRepository;
 import uber.taxi.repository.RideRequestRepository;
@@ -71,11 +72,18 @@ public class RideMatchingService {
     }
 
     @Transactional(readOnly = true)
-    public List<RideMatchResponse> getForRide(UUID rideId) {
-        if (!rideRepository.existsById(rideId)) {
-            throw new RideRequestNotFoundException(rideId);
+    public List<RideMatchResponse> getForRide(UUID actorId, UUID rideId) {
+        RideRequest ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new RideRequestNotFoundException(rideId));
+        if (!ride.getUser().getId().equals(actorId)) {
+            throw new ForbiddenException("You do not own this ride request");
         }
         return matchRepository.findAllForRide(rideId).stream().map(matchMapper::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RideMatchResponse> getForUser(UUID userId) {
+        return matchRepository.findAllForUser(userId).stream().map(matchMapper::toResponse).toList();
     }
 
     @Transactional

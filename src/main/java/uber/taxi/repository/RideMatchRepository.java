@@ -47,4 +47,15 @@ public interface RideMatchRepository extends JpaRepository<RideMatch, UUID> {
             order by rm.matchScore desc
             """)
     List<RideMatch> findAllForRide(@Param("rideId") UUID rideId);
+
+    @Query("""
+            select rm from RideMatch rm
+            join fetch rm.rideRequest1 ride1
+            join fetch ride1.user
+            join fetch rm.rideRequest2 ride2
+            join fetch ride2.user
+            where ride1.user.id = :userId or ride2.user.id = :userId
+            order by rm.matchScore desc
+            """)
+    List<RideMatch> findAllForUser(@Param("userId") UUID userId);
 }

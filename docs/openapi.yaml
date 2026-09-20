@@ -1,916 +1,326 @@
 openapi: 3.1.0
 info:
   title: Taxi Ride Matching API
-  description: |
-    REST API for creating users and ride requests, discovering route-compatible
-    travelers, completing two-sided match acceptance, and messaging in the private
-    chat created for an accepted match.
-
-    Typical workflow:
-    1. Create two users.
-    2. Create one future ride for each user. Matching runs when a ride is created.
-    3. Retrieve a ride's potential matches.
-    4. Both participating users accept the same match.
-    5. Use the returned chat ID to send and retrieve messages.
-
-    Authentication is not implemented in this MVP. Acting user IDs are supplied in
-    request bodies and must belong to the relevant ride or chat.
-  contact:
-    name: Taxi API maintainers
-  license:
-    name: Private project
-    identifier: LicenseRef-Proprietary
   version: 1.0.0-MVP
-externalDocs:
-  description: Repository setup and workflow documentation
-  url: ./README.md
+  description: |
+    JWT-protected API for registering travelers, planning rides, finding compatible
+    routes, accepting matches, and messaging in private accepted-match chats.
+    Register or log in, then supply `Authorization: Bearer <accessToken>`.
 servers:
-- url: http://localhost:8080
-  description: Local development
+  - url: http://localhost:8080
+    description: Local development
 tags:
-- name: Users
-  description: Create and retrieve platform users.
-- name: Rides
-  description: "Create, inspect, update, and cancel planned trips."
-- name: Matches
-  description: Inspect compatibility results and record user decisions.
-- name: Chats
-  description: Access accepted-match chats and exchange messages.
+  - name: Authentication
+  - name: Users
+  - name: Rides
+  - name: Matches
+  - name: Chats
 paths:
-  /api/rides/{id}:
-    get:
-      tags:
-      - Rides
-      summary: Get a ride request
-      operationId: get
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: Ride found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "404":
-          description: Ride not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-    put:
-      tags:
-      - Rides
-      summary: Update an open ride
-      description: "Re-resolves locations and route data, cancels stale pending matches,\
-        \ and reruns matching. Only OPEN rides can be updated."
-      operationId: update
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateRideRequest"
-        required: true
-      responses:
-        "200":
-          description: Ride updated
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "400":
-          description: Validation or location failure
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "404":
-          description: Ride not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "409":
-          description: Ride is not open
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-    delete:
-      tags:
-      - Rides
-      summary: Cancel a ride
-      description: Performs a soft cancellation by changing status to CANCELLED and
-        cancelling pending matches; no database row is deleted.
-      operationId: cancel
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: Ride cancelled
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "404":
-          description: Ride not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "409":
-          description: Ride cannot be cancelled in its current state
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-  /api/users:
-    get:
-      tags:
-      - Users
-      summary: Find a user by email
-      description: Returns an existing user by email so the same account can create
-        additional ride requests without being registered again.
-      operationId: getByEmail
-      parameters:
-      - name: email
-        in: query
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: User found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
-        "404":
-          description: No user has this email
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
+  /api/auth/register:
     post:
-      tags:
-      - Users
-      summary: Create a user
-      description: Creates a user with a unique email address. The returned UUID is
-        used when creating rides and acting in match/chat workflows.
-      operationId: create
+      tags: [Authentication]
+      summary: Register a traveler and send an email verification code
+      security: []
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/CreateUserRequest"
-        required: true
+            schema: {$ref: '#/components/schemas/RegisterRequest'}
       responses:
-        "201":
-          description: User created
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
-        "400":
-          description: Validation failed
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
-        "409":
-          description: Email already exists
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
+        '202': {description: Verification code sent, content: {application/json: {schema: {$ref: '#/components/schemas/VerificationPendingResponse'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '409': {description: Email is already registered}
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Log in and issue a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200': {description: Logged in, content: {application/json: {schema: {$ref: '#/components/schemas/AuthResponse'}}}}
+        '401': {description: Invalid email or password}
+        '403': {description: Email address has not yet been verified}
+  /api/auth/verify-email:
+    post:
+      tags: [Authentication]
+      summary: Verify the six-digit email code and issue a JWT
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VerificationCodeRequest'}
+      responses:
+        '200': {description: Gmail verified, content: {application/json: {schema: {$ref: '#/components/schemas/AuthResponse'}}}}
+        '400': {description: Invalid, expired, or exhausted verification code}
+  /api/auth/resend-verification:
+    post:
+      tags: [Authentication]
+      summary: Send a replacement email verification code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ResendVerificationRequest'}
+      responses:
+        '202': {description: Replacement code sent, content: {application/json: {schema: {$ref: '#/components/schemas/VerificationPendingResponse'}}}}
+        '400': {description: No pending verification or resend cooldown is active}
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Get the authenticated traveler
+      responses:
+        '200': {description: Traveler profile, content: {application/json: {schema: {$ref: '#/components/schemas/UserResponse'}}}}
   /api/rides:
+    get:
+      tags: [Rides]
+      summary: List my ride requests
+      responses:
+        '200': {description: Ride list, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/RideResponse'}}}}}
     post:
-      tags:
-      - Rides
-      summary: Create a ride request
-      description: "Geocodes pickup/destination, calculates a driving route, stores\
-        \ the OPEN ride, and immediately evaluates compatible OPEN rides owned by\
-        \ other users. departureTime must be a future ISO-8601 instant."
-      operationId: create_1
+      tags: [Rides]
+      summary: Create a ride request for the authenticated traveler
+      description: Resolves both locations, calculates a route, stores an OPEN ride, and evaluates potential matches.
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/CreateRideRequest"
-        required: true
+            schema: {$ref: '#/components/schemas/CreateRideRequest'}
       responses:
-        "201":
-          description: Ride created
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "400":
-          description: Invalid request or location
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "404":
-          description: User not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "502":
-          description: Map provider failed
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-        "503":
-          description: Map provider unavailable or quota exceeded
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RideResponse"
-  /api/matches/{matchId}/reject:
-    post:
-      tags:
-      - Matches
-      summary: Reject a potential match
-      description: Marks a PENDING match REJECTED. Rejected matches cannot later be
-        accepted.
-      operationId: reject
-      parameters:
-      - name: matchId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+        '201': {description: Ride created, content: {application/json: {schema: {$ref: '#/components/schemas/RideResponse'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '502': {description: Maps provider request failed}
+        '503': {description: Maps provider is unavailable or quota-limited}
+  /api/rides/{rideId}:
+    parameters:
+      - $ref: '#/components/parameters/RideId'
+    get:
+      tags: [Rides]
+      summary: Get one of my rides
+      responses:
+        '200': {description: Ride found, content: {application/json: {schema: {$ref: '#/components/schemas/RideResponse'}}}}
+        '403': {description: Ride belongs to another traveler}
+        '404': {description: Ride not found}
+    put:
+      tags: [Rides]
+      summary: Update one of my OPEN rides
       requestBody:
+        required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/MatchActionRequest"
-        required: true
+            schema: {$ref: '#/components/schemas/CreateRideRequest'}
       responses:
-        "200":
-          description: Match rejected
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-        "400":
-          description: Acting user is not a participant
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-        "404":
-          description: Match not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-        "409":
-          description: Match is already terminal
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-  /api/matches/{matchId}/accept:
-    post:
-      tags:
-      - Matches
-      summary: Accept a potential match
-      description: "Records acceptance for one participating user. The first acceptance\
-        \ leaves the match PENDING. The second acceptance atomically marks it ACCEPTED,\
-        \ marks both rides MATCHED, and creates exactly one private chat."
-      operationId: accept
-      parameters:
-      - name: matchId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MatchActionRequest"
-        required: true
+        '200': {description: Ride updated, content: {application/json: {schema: {$ref: '#/components/schemas/RideResponse'}}}}
+        '403': {description: Ride belongs to another traveler}
+        '409': {description: Ride is no longer OPEN}
+    delete:
+      tags: [Rides]
+      summary: Soft-cancel one of my rides
       responses:
-        "200":
-          description: Decision recorded; chatId is populated after both accept
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-        "400":
-          description: Acting user is not a participant
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-        "404":
-          description: Match not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-        "409":
-          description: Match or ride state prevents acceptance
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MatchActionResponse"
-  /api/chats/{chatId}/messages:
-    get:
-      tags:
-      - Chats
-      summary: List chat messages
-      description: Returns a pageable message history. Defaults to 50 messages ordered
-        by sentAt ascending. Use page and size query parameters for pagination.
-      operationId: getMessages
-      parameters:
-      - name: chatId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - name: pageable
-        in: query
-        required: true
-        schema:
-          $ref: "#/components/schemas/Pageable"
-      responses:
-        "200":
-          description: Message page returned
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PageMessageResponse"
-        "404":
-          description: Chat not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/PageMessageResponse"
-    post:
-      tags:
-      - Chats
-      summary: Send a chat message
-      description: Creates a message when senderId belongs to this chat. Messages
-        must contain 1–4000 non-blank characters.
-      operationId: sendMessage
-      parameters:
-      - name: chatId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SendMessageRequest"
-        required: true
-      responses:
-        "201":
-          description: Message sent
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          description: Validation failed or sender is not a participant
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "404":
-          description: Chat or sender not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-  /api/users/{userId}/rides:
-    get:
-      tags:
-      - Rides
-      summary: List a user's rides
-      description: Returns all ride requests owned by the supplied user.
-      operationId: getForUser
-      parameters:
-      - name: userId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: Ride list returned
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RideResponse"
-        "404":
-          description: User not found
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RideResponse"
-  /api/users/{userId}/chats:
-    get:
-      tags:
-      - Chats
-      summary: List a user's chats
-      description: Returns chats in which the supplied user is a participant.
-      operationId: getForUser_1
-      parameters:
-      - name: userId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: Chat list returned
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatResponse"
-        "404":
-          description: User not found
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ChatResponse"
-  /api/users/{id}:
-    get:
-      tags:
-      - Users
-      summary: Get a user
-      description: Returns one user by UUID.
-      operationId: get_1
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: User found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
-        "404":
-          description: User not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
+        '200': {description: Ride cancelled, content: {application/json: {schema: {$ref: '#/components/schemas/RideResponse'}}}}
+        '403': {description: Ride belongs to another traveler}
+        '409': {description: Ride cannot be cancelled in its current state}
   /api/rides/{rideId}/matches:
+    parameters:
+      - $ref: '#/components/parameters/RideId'
     get:
-      tags:
-      - Matches
-      summary: List potential matches for a ride
-      description: "Returns persisted matches ordered by score. An empty array means\
-        \ no candidate passed user, time, proximity, destination, overlap, and minimum-score\
-        \ checks."
-      operationId: getMatches
-      parameters:
-      - name: rideId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+      tags: [Matches]
+      summary: List potential matches for one of my rides
       responses:
-        "200":
-          description: Match list returned
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RideMatchResponse"
-        "404":
-          description: Ride not found
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/RideMatchResponse"
+        '200': {description: Ranked matches, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/RideMatchResponse'}}}}}
+        '403': {description: Ride belongs to another traveler}
+  /api/matches/{matchId}/accept:
+    parameters:
+      - $ref: '#/components/parameters/MatchId'
+    post:
+      tags: [Matches]
+      summary: Accept a match as the authenticated participant
+      responses:
+        '200': {description: Decision recorded; chatId is present after both users accept, content: {application/json: {schema: {$ref: '#/components/schemas/MatchActionResponse'}}}}
+        '403': {description: User is not a match participant}
+        '409': {description: Match cannot be accepted in its current state}
+  /api/matches/mine:
+    get:
+      tags: [Matches]
+      summary: List the authenticated user's ranked ride matches
+      responses:
+        '200': {description: Ranked matches, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/RideMatchResponse'}}}}}
+  /api/matches/{matchId}/reject:
+    parameters:
+      - $ref: '#/components/parameters/MatchId'
+    post:
+      tags: [Matches]
+      summary: Reject a match as the authenticated participant
+      responses:
+        '200': {description: Match rejected, content: {application/json: {schema: {$ref: '#/components/schemas/MatchActionResponse'}}}}
+        '403': {description: User is not a match participant}
+  /api/chats/mine:
+    get:
+      tags: [Chats]
+      summary: List the authenticated user's chats
+      responses:
+        '200': {description: Chat list, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/ChatResponse'}}}}}
   /api/chats/{chatId}:
+    parameters:
+      - $ref: '#/components/parameters/ChatId'
     get:
-      tags:
-      - Chats
-      summary: Get a chat
-      description: Returns chat metadata and both participant UUIDs.
-      operationId: get_2
-      parameters:
-      - name: chatId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
+      tags: [Chats]
+      summary: Get a chat if I am a participant
       responses:
-        "200":
-          description: Chat found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ChatResponse"
-        "404":
-          description: Chat not found
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ChatResponse"
+        '200': {description: Chat found, content: {application/json: {schema: {$ref: '#/components/schemas/ChatResponse'}}}}
+        '403': {description: User is not a chat participant}
+  /api/chats/{chatId}/messages:
+    parameters:
+      - $ref: '#/components/parameters/ChatId'
+    get:
+      tags: [Chats]
+      summary: List messages if I am a participant
+      parameters:
+        - {name: page, in: query, schema: {type: integer, minimum: 0, default: 0}}
+        - {name: size, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      responses:
+        '200': {description: Message page, content: {application/json: {schema: {$ref: '#/components/schemas/MessagePage'}}}}
+        '403': {description: User is not a chat participant}
+    post:
+      tags: [Chats]
+      summary: Send a message as the authenticated participant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SendMessageRequest'}
+      responses:
+        '201': {description: Message created, content: {application/json: {schema: {$ref: '#/components/schemas/MessageResponse'}}}}
+        '403': {description: User is not a chat participant}
 components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    RideId: {name: rideId, in: path, required: true, schema: {type: string, format: uuid}}
+    MatchId: {name: matchId, in: path, required: true, schema: {type: string, format: uuid}}
+    ChatId: {name: chatId, in: path, required: true, schema: {type: string, format: uuid}}
+  responses:
+    BadRequest: {description: Request validation failed}
   schemas:
-    UpdateRideRequest:
+    RegisterRequest:
       type: object
-      description: Replacement trip details for an existing OPEN ride
+      required: [firstName, lastName, email, password]
       properties:
-        pickupAddress:
-          type: string
-          example: "Arlington Heights, IL"
-          maxLength: 500
-          minLength: 0
-        destinationAddress:
-          type: string
-          example: "Millennium Park, Chicago, IL"
-          maxLength: 500
-          minLength: 0
-        departureTime:
-          type: string
-          format: date-time
-          example: 2030-08-17T15:50:28.760Z
-      required:
-      - departureTime
-      - destinationAddress
-      - pickupAddress
-    RideResponse:
+        firstName: {type: string, example: Nithin}
+        lastName: {type: string, example: User}
+        email: {type: string, format: email, example: nithin@gmail.com, description: Gmail address only}
+        phoneNumber: {type: string, example: '+1 312-555-0101'}
+        password: {type: string, format: password, minLength: 8, writeOnly: true}
+    LoginRequest:
       type: object
-      description: Stored ride including resolved coordinates and compact route data
+      required: [email, password]
       properties:
-        id:
-          type: string
-          format: uuid
-        userId:
-          type: string
-          format: uuid
-        pickupAddress:
-          type: string
-        pickupLatitude:
-          type: number
-        pickupLongitude:
-          type: number
-        pickupPlaceId:
-          type: string
-        destinationAddress:
-          type: string
-        destinationLatitude:
-          type: number
-        destinationLongitude:
-          type: number
-        destinationPlaceId:
-          type: string
-        routeDistanceMeters:
-          type: integer
-          format: int64
-        routeDurationSeconds:
-          type: integer
-          format: int64
-        routeEncodedPolyline:
-          type: string
-        departureTime:
-          type: string
-          format: date-time
-        status:
-          type: string
-          enum:
-          - OPEN
-          - MATCHED
-          - CANCELLED
-          - COMPLETED
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-    CreateUserRequest:
+        email: {type: string, format: email, description: Gmail address only}
+        password: {type: string, format: password, writeOnly: true}
+    VerificationCodeRequest:
       type: object
-      description: Information required to register an MVP user
+      required: [email, code]
       properties:
-        firstName:
-          type: string
-          example: Nithin
-          maxLength: 100
-          minLength: 0
-        lastName:
-          type: string
-          example: User
-          maxLength: 100
-          minLength: 0
-        email:
-          type: string
-          format: email
-          example: nithin@example.com
-          maxLength: 320
-          minLength: 0
-        phoneNumber:
-          type: string
-          example: +1 312-555-0101
-          pattern: "^$|^[+0-9(). -]{7,30}$"
-      required:
-      - email
-      - firstName
-      - lastName
+        email: {type: string, format: email, example: nithin@gmail.com}
+        code: {type: string, pattern: '^[0-9]{6}$', example: '123456'}
+    ResendVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email: {type: string, format: email, example: nithin@gmail.com}
+    VerificationPendingResponse:
+      type: object
+      properties:
+        email: {type: string, format: email}
+        expiresAt: {type: string, format: date-time}
+        verificationRequired: {type: boolean, example: true}
+    AuthResponse:
+      type: object
+      properties:
+        accessToken: {type: string, description: JWT bearer token}
+        tokenType: {type: string, example: Bearer}
+        expiresAt: {type: string, format: date-time}
+        user: {$ref: '#/components/schemas/UserResponse'}
     UserResponse:
       type: object
-      description: Registered platform user
       properties:
-        id:
-          type: string
-          format: uuid
-        firstName:
-          type: string
-        lastName:
-          type: string
-        email:
-          type: string
-        phoneNumber:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
+        id: {type: string, format: uuid}
+        firstName: {type: string}
+        lastName: {type: string}
+        email: {type: string, format: email}
+        phoneNumber: {type: string}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}
     CreateRideRequest:
       type: object
-      description: A user's planned trip. Addresses are resolved by the configured
-        map provider.
+      required: [pickupAddress, destinationAddress, departureTime]
       properties:
-        userId:
-          type: string
-          format: uuid
-          example: 3d4692be-cb4d-439d-ba31-5088fa217cd6
-        pickupAddress:
-          type: string
-          example: "Schaumburg, IL"
-          maxLength: 500
-          minLength: 0
-        destinationAddress:
-          type: string
-          example: "Millennium Park, Chicago, IL"
-          maxLength: 500
-          minLength: 0
-        departureTime:
-          type: string
-          format: date-time
-          description: Future UTC instant
-          example: 2030-08-17T15:40:28.760Z
-      required:
-      - departureTime
-      - destinationAddress
-      - pickupAddress
-      - userId
-    MatchActionRequest:
+        pickupAddress: {type: string, example: 'Schaumburg, IL'}
+        destinationAddress: {type: string, example: 'Millennium Park, Chicago, IL'}
+        departureTime: {type: string, format: date-time}
+    RideResponse:
       type: object
-      description: Identifies which matched user is accepting or rejecting
       properties:
-        userId:
-          type: string
-          format: uuid
-          example: 3d4692be-cb4d-439d-ba31-5088fa217cd6
-      required:
-      - userId
-    MatchActionResponse:
-      type: object
-      description: Current match state after a decision; chatId is null until both
-        users accept
-      properties:
-        matchId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum:
-          - PENDING
-          - ACCEPTED
-          - REJECTED
-          - CANCELLED
-        chatId:
-          type: string
-          format: uuid
-    SendMessageRequest:
-      type: object
-      description: Message submitted by a participant in an accepted-match chat
-      properties:
-        senderId:
-          type: string
-          format: uuid
-          example: 3d4692be-cb4d-439d-ba31-5088fa217cd6
-        message:
-          type: string
-          example: See you at the pickup point
-          maxLength: 4000
-          minLength: 0
-      required:
-      - message
-      - senderId
-    MessageResponse:
-      type: object
-      description: Persisted chat message
-      properties:
-        id:
-          type: string
-          format: uuid
-        chatId:
-          type: string
-          format: uuid
-        senderId:
-          type: string
-          format: uuid
-        message:
-          type: string
-        sentAt:
-          type: string
-          format: date-time
-        readAt:
-          type: string
-          format: date-time
-    ChatResponse:
-      type: object
-      description: Private chat created exactly once for an accepted ride match
-      properties:
-        id:
-          type: string
-          format: uuid
-        rideMatchId:
-          type: string
-          format: uuid
-        participantIds:
-          type: array
-          items:
-            type: string
-            format: uuid
-        createdAt:
-          type: string
-          format: date-time
+        id: {type: string, format: uuid}
+        userId: {type: string, format: uuid, readOnly: true}
+        pickupAddress: {type: string}
+        pickupLatitude: {type: number}
+        pickupLongitude: {type: number}
+        destinationAddress: {type: string}
+        destinationLatitude: {type: number}
+        destinationLongitude: {type: number}
+        routeDistanceMeters: {type: integer, format: int64}
+        routeDurationSeconds: {type: integer, format: int64}
+        departureTime: {type: string, format: date-time}
+        status: {type: string, enum: [OPEN, MATCHED, CANCELLED, COMPLETED]}
     RideMatchResponse:
       type: object
-      description: Compatibility evaluation for two ride requests. Scores range from
-        0 to 1; distances are meters.
       properties:
-        id:
-          type: string
-          format: uuid
-        rideRequest1Id:
-          type: string
-          format: uuid
-        rideRequest2Id:
-          type: string
-          format: uuid
-        matchScore:
-          type: number
-          format: double
-        pickupDistanceMeters:
-          type: number
-          format: double
-        destinationDistanceMeters:
-          type: number
-          format: double
-        routeSimilarity:
-          type: number
-          format: double
-        departureTimeDifferenceSeconds:
-          type: integer
-          format: int64
-        status:
-          type: string
-          enum:
-          - PENDING
-          - ACCEPTED
-          - REJECTED
-          - CANCELLED
-        rideRequest1AcceptedAt:
-          type: string
-          format: date-time
-        rideRequest2AcceptedAt:
-          type: string
-          format: date-time
-        createdAt:
-          type: string
-          format: date-time
-    Pageable:
+        id: {type: string, format: uuid}
+        rideRequest1Id: {type: string, format: uuid}
+        rideRequest2Id: {type: string, format: uuid}
+        matchScore: {type: number}
+        pickupDistanceMeters: {type: number}
+        destinationDistanceMeters: {type: number}
+        routeSimilarity: {type: number}
+        status: {type: string, enum: [PENDING, ACCEPTED, REJECTED, CANCELLED]}
+    MatchActionResponse:
       type: object
       properties:
-        page:
-          type: integer
-          format: int32
-          minimum: 0
-        size:
-          type: integer
-          format: int32
-          minimum: 1
-        sort:
-          type: array
-          items:
-            type: string
-    PageMessageResponse:
+        matchId: {type: string, format: uuid}
+        status: {type: string, enum: [PENDING, ACCEPTED, REJECTED, CANCELLED]}
+        chatId: {type: [string, 'null'], format: uuid}
+    ChatResponse:
       type: object
       properties:
-        totalElements:
-          type: integer
-          format: int64
-        totalPages:
-          type: integer
-          format: int32
-        first:
-          type: boolean
-        last:
-          type: boolean
-        numberOfElements:
-          type: integer
-          format: int32
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        size:
-          type: integer
-          format: int32
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/MessageResponse"
-        number:
-          type: integer
-          format: int32
-        empty:
-          type: boolean
-    PageableObject:
+        id: {type: string, format: uuid}
+        rideMatchId: {type: string, format: uuid}
+        participantIds: {type: array, items: {type: string, format: uuid}}
+        createdAt: {type: string, format: date-time}
+    SendMessageRequest:
+      type: object
+      required: [message]
+      properties:
+        message: {type: string, minLength: 1, maxLength: 4000}
+    MessageResponse:
       type: object
       properties:
-        paged:
-          type: boolean
-        pageNumber:
-          type: integer
-          format: int32
-        pageSize:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
-        offset:
-          type: integer
-          format: int64
-    SortObject:
+        id: {type: string, format: uuid}
+        chatId: {type: string, format: uuid}
+        senderId: {type: string, format: uuid}
+        message: {type: string}
+        sentAt: {type: string, format: date-time}
+    MessagePage:
       type: object
       properties:
-        sorted:
-          type: boolean
-        unsorted:
-          type: boolean
-        empty:
-          type: boolean
+        content: {type: array, items: {$ref: '#/components/schemas/MessageResponse'}}
+        totalElements: {type: integer, format: int64}
+        totalPages: {type: integer}
+        number: {type: integer}
+security:
+  - bearerAuth: []

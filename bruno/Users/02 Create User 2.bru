@@ -1,11 +1,11 @@
 meta {
-  name: Create User 2
+  name: Register User 2
   type: http
   seq: 2
 }
 
 post {
-  url: {{baseUrl}}/api/users
+  url: {{baseUrl}}/api/auth/register
   body: json
   auth: none
 }
@@ -19,23 +19,28 @@ body:json {
     "firstName": "John",
     "lastName": "Doe",
     "email": "{{user2Email}}",
-    "phoneNumber": "+1 847-555-0102"
+    "phoneNumber": "+1 847-555-0102",
+    "password": "{{user2Password}}"
   }
 }
 
 script:pre-request {
-  bru.setVar("user2Email", `john.${Date.now()}@example.com`);
+  const email = `john.${Date.now()}@example.com`;
+  bru.setVar("user2Email", email);
+  bru.setEnvVar("user2Email", email);
 }
 
 script:post-response {
   if (res.status === 201) {
-    bru.setEnvVar("user2Id", res.body.id);
+    bru.setEnvVar("user2Id", res.body.user.id);
+    bru.setEnvVar("user2Token", res.body.accessToken);
   }
 }
 
 tests {
   test("User 2 is created", function () {
     expect(res.status).to.equal(201);
-    expect(res.body.id).to.be.a("string");
+    expect(res.body.user.id).to.be.a("string");
+    expect(res.body.accessToken).to.be.a("string");
   });
 }

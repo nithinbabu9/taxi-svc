@@ -59,7 +59,7 @@ public class RideRequest extends BaseEntity {
 
     private Long routeDurationSeconds;
 
-    @Column(length = 20000)
+    @Column(columnDefinition = "TEXT")
     private String routeEncodedPolyline;
 
     @Column(nullable = false)

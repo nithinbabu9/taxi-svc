@@ -1,0 +1,11 @@
+.git
+.idea
+.vscode
+.codex
+.agents
+target
+.env
+.env.*
+!.env.example
+*.iml
+.DS_Store

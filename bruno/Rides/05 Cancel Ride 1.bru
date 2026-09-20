@@ -7,7 +7,11 @@ meta {
 delete {
   url: {{baseUrl}}/api/rides/{{ride1Id}}
   body: none
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user1Token}}
 }
 
 tests {

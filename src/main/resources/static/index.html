@@ -3,169 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Taxi ride matching local test interface">
-  <title>Wayfare — Share the road</title>
+  <meta name="description" content="Wayfare ride sharing and route matching">
+  <title>Wayfare — Better trips, together</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/verification.css">
 </head>
 <body>
-  <div class="ambient ambient-one"></div>
-  <div class="ambient ambient-two"></div>
-
-  <header class="topbar">
-    <a class="brand" href="#top" aria-label="Wayfare home">
-      <span class="brand-mark">
-        <svg viewBox="0 0 42 42" aria-hidden="true"><path d="M9 27c7-1 8-13 14-13 5 0 5 8 10 8"/><circle cx="9" cy="27" r="3"/><circle cx="33" cy="22" r="3"/></svg>
-      </span>
-      <span>wayfare</span>
-    </a>
-    <nav>
-      <a href="#rides">Rides</a>
-      <a href="#matches">Matches</a>
-      <a href="#chat">Chat</a>
-    </nav>
-    <div class="status-pill"><span id="statusDot"></span><span id="apiStatus">Checking API</span></div>
-  </header>
-
-  <main id="top">
-    <section class="hero">
-      <div class="hero-copy">
-        <div class="eyebrow"><span></span> LOCAL RIDE-MATCHING LAB</div>
-        <h1>Same direction.<br><em>Better journey.</em></h1>
-        <p>Create two travelers, plan nearby trips, and watch the matching engine bring them together—all from one thoughtful workspace.</p>
-        <div class="hero-actions">
-          <a class="button primary" href="#travelers">Start a test ride <span>→</span></a>
-          <!--suppress HtmlUnknownTarget -->
-          <a class="button ghost" href="/swagger-ui.html" target="_blank" rel="noopener">Explore API</a>
-        </div>
-        <div class="hero-stats">
-          <div><strong>4</strong><span>match signals</span></div>
-          <div><strong>30m</strong><span>time window</span></div>
-          <div><strong>1</strong><span>private chat</span></div>
-        </div>
-      </div>
-      <div class="route-visual" aria-label="Illustrated route between Schaumburg and Chicago">
-        <div class="map-grid"></div>
-        <div class="route-label origin"><span></span><div><small>PICKUP</small><strong>Schaumburg</strong></div></div>
-        <div class="route-label destination"><span></span><div><small>DESTINATION</small><strong>Chicago</strong></div></div>
-        <svg class="route-line" viewBox="0 0 500 500" fill="none" aria-hidden="true">
-          <path class="route-shadow" d="M90 375C145 315 123 228 205 202C285 177 291 91 413 112"/>
-          <path class="route-path" d="M90 375C145 315 123 228 205 202C285 177 291 91 413 112"/>
-        </svg>
-        <div class="car">↗</div>
-        <div class="route-card"><span class="mini-icon">⌁</span><div><small>ESTIMATED ROUTE</small><strong>49.1 km <i>•</i> 46 min</strong></div></div>
-      </div>
-    </section>
-
-    <section class="workspace" id="travelers">
-      <div class="section-heading">
-        <div><span class="step-number">01</span><h2>Create your travelers</h2></div>
-        <p>Use unique emails each time. IDs are saved in this browser automatically.</p>
-      </div>
-      <div class="two-column">
-        <form class="panel traveler-panel" id="user1Form">
-          <div class="panel-top"><div class="avatar coral">A</div><div><small>TRAVELER ONE</small><h3>Primary rider</h3></div><span class="saved-badge" id="user1Badge">Not created</span></div>
-          <div class="form-grid">
-            <label>First name<input name="firstName" value="Nithin" required maxlength="100"></label>
-            <label>Last name<input name="lastName" value="User" required maxlength="100"></label>
-            <label class="wide">Email<input name="email" type="email" data-dynamic-email="nithin" required></label>
-            <label class="wide">Phone<input name="phoneNumber" value="+1 312-555-0101"></label>
-          </div>
-          <button class="button dark full" type="submit">Create or use traveler A <span>→</span></button>
-        </form>
-        <form class="panel traveler-panel" id="user2Form">
-          <div class="panel-top"><div class="avatar teal">B</div><div><small>TRAVELER TWO</small><h3>Potential match</h3></div><span class="saved-badge" id="user2Badge">Not created</span></div>
-          <div class="form-grid">
-            <label>First name<input name="firstName" value="John" required maxlength="100"></label>
-            <label>Last name<input name="lastName" value="Doe" required maxlength="100"></label>
-            <label class="wide">Email<input name="email" type="email" data-dynamic-email="john" required></label>
-            <label class="wide">Phone<input name="phoneNumber" value="+1 847-555-0102"></label>
-          </div>
-          <button class="button dark full" type="submit">Create or use traveler B <span>→</span></button>
-        </form>
-      </div>
-    </section>
-
-    <section class="workspace tinted" id="rides">
-      <div class="section-heading">
-        <div><span class="step-number">02</span><h2>Plan compatible rides</h2></div>
-        <div class="heading-actions"><p>The local profile resolves fixture coordinates and calculates an offline route.</p><button class="button ghost compact" id="newBooking" type="button">Start another booking</button></div>
-      </div>
-      <div class="two-column">
-        <form class="panel ride-panel" id="ride1Form">
-          <div class="route-title"><span class="route-dot coral"></span><h3>Traveler A's trip</h3><span class="saved-badge" id="ride1Badge">Waiting</span></div>
-          <label>Pickup address<input name="pickupAddress" value="Schaumburg, IL" required></label>
-          <div class="connector"></div>
-          <label>Destination<input name="destinationAddress" value="Millennium Park, Chicago, IL" required></label>
-          <label>Departure time<input name="departureTime" type="datetime-local" required></label>
-          <button class="button primary full" type="submit">Create ride A</button>
-        </form>
-        <form class="panel ride-panel" id="ride2Form">
-          <div class="route-title"><span class="route-dot teal"></span><h3>Traveler B's trip</h3><span class="saved-badge" id="ride2Badge">Waiting</span></div>
-          <label>Pickup address<input name="pickupAddress" value="Arlington Heights, IL" required></label>
-          <div class="connector"></div>
-          <label>Destination<input name="destinationAddress" value="Millennium Park, Chicago, IL" required></label>
-          <label>Departure time<input name="departureTime" type="datetime-local" required></label>
-          <button class="button primary full" type="submit">Create ride B & find match</button>
-        </form>
-      </div>
-    </section>
-
-    <section class="workspace" id="matches">
-      <div class="section-heading">
-        <div><span class="step-number">03</span><h2>Review the match</h2></div>
-        <button class="button ghost compact" id="refreshMatches" type="button">Refresh matches</button>
-      </div>
-      <div id="matchEmpty" class="empty-state">
-        <div class="empty-orbit"><span>⌁</span></div>
-        <h3>No match loaded yet</h3>
-        <p>Create both rides, then refresh to see compatibility details.</p>
-      </div>
-      <article id="matchCard" class="match-card hidden">
-        <div class="match-people">
-          <div class="avatar coral large">A</div><div class="match-line"><span></span><div>compatible route</div></div><div class="avatar teal large">B</div>
-        </div>
-        <div class="score-ring"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52"/><circle id="scoreCircle" class="progress" cx="60" cy="60" r="52"/></svg><div><strong id="matchScore">0%</strong><span>MATCH</span></div></div>
-        <div class="metrics">
-          <div><span>Pickup gap</span><strong id="pickupDistance">—</strong></div>
-          <div><span>Destination gap</span><strong id="destinationDistance">—</strong></div>
-          <div><span>Route overlap</span><strong id="routeSimilarity">—</strong></div>
-          <div><span>Time difference</span><strong id="timeDifference">—</strong></div>
-        </div>
-        <div class="acceptance">
-          <button class="button dark" id="acceptUser1" type="button">Traveler A accepts</button>
-          <button class="button dark" id="acceptUser2" type="button">Traveler B accepts</button>
-        </div>
-      </article>
-    </section>
-
-    <section class="workspace chat-section" id="chat">
-      <div class="section-heading light">
-        <div><span class="step-number">04</span><h2>Coordinate the journey</h2></div>
-        <span class="chat-state" id="chatState"><i></i> Chat unlocks after both accept</span>
-      </div>
-      <div class="chat-shell">
-        <aside>
-          <div class="avatar-stack"><div class="avatar coral">A</div><div class="avatar teal">B</div></div>
-          <h3>Ride coordination</h3><p>Private conversation for this accepted match.</p>
-          <div class="chat-meta"><span>Chat ID</span><code id="chatIdText">Not created</code></div>
-        </aside>
-        <div class="conversation">
-          <div class="messages" id="messages"><div class="chat-placeholder"><span>✦</span><p>Your conversation will appear here.</p></div></div>
-          <form class="message-form" id="messageForm">
-            <select id="messageSender" aria-label="Message sender"><option value="user1Id">Traveler A</option><option value="user2Id">Traveler B</option></select>
-            <input id="messageText" aria-label="Message text" placeholder="Write a message…" maxlength="4000" required disabled>
-            <button type="submit" aria-label="Send message" disabled>↑</button>
-          </form>
-        </div>
-      </div>
+  <div class="orb orb-one"></div><div class="orb orb-two"></div>
+  <main id="publicView" class="public-view">
+    <header class="public-nav"><a class="brand" href="/" aria-label="Wayfare home"><span class="brand-symbol">⌁</span>wayfare</a></header>
+    <section class="welcome-grid">
+      <div class="welcome-copy"><span class="kicker"><i></i> RIDE TOGETHER, BETTER</span><h1>Your route.<br><em>Better company.</em></h1><p>Plan a trip and discover people whose travel plans fit well with yours. Review each recommendation and choose who you would like to connect with.</p><div class="trust-row"><span>✦ Private by design</span><span>⌁ Thoughtful introductions</span><span>↗ Two-way consent</span></div></div>
+      <section class="auth-card" aria-label="Account access"><div class="auth-card-head"><span class="eyebrow">YOUR WAYFARE</span><h2 id="authTitle">Welcome back</h2><p id="authSubtitle">Log in to continue planning better trips.</p></div><div id="authSwitch" class="auth-switch" role="tablist"><button id="loginTab" class="active" type="button">Log in</button><button id="registerTab" type="button">Create account</button></div>
+        <form id="authForm" novalidate><div id="registrationFields" class="registration-fields hidden"><label>First name<input name="firstName" maxlength="100" autocomplete="given-name"></label><label>Last name<input name="lastName" maxlength="100" autocomplete="family-name"></label><label class="wide">Phone <span class="optional">optional</span><input name="phoneNumber" maxlength="30" autocomplete="tel"></label></div><label>Email address <span class="optional">Gmail only</span><input id="emailInput" name="email" type="email" maxlength="320" autocomplete="email" required placeholder="you@gmail.com"></label><label>Password<div class="password-wrap"><input id="passwordInput" name="password" type="password" minlength="12" maxlength="72" autocomplete="current-password" required placeholder="Minimum 12 characters"><button id="passwordToggle" type="button" aria-label="Show password" title="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.8"/></svg></button></div></label><button id="authSubmit" class="primary-button full" type="submit">Log in <span>→</span></button></form>
+        <form id="verificationForm" class="verification-form hidden" novalidate><div class="verification-icon">✉</div><span class="eyebrow">VERIFY YOUR EMAIL</span><h3>Check your inbox</h3><p id="verificationHelp">Enter the six-digit code sent to your Gmail address.</p><label>Verification code<input id="verificationCode" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required placeholder="000000"></label><button id="verifyButton" class="primary-button full" type="submit">Verify and continue <span>→</span></button><button id="resendButton" class="text-button" type="button">Resend code</button><button id="backToAuthButton" class="text-button" type="button">Use a different account</button></form>
+        <p class="auth-foot" id="authFoot">New here? Create an account in less than a minute.</p>
+      </section>
     </section>
   </main>
-
-  <footer><div class="brand footer-brand"><span class="brand-mark">⌁</span><span>wayfare</span></div><p>Local experience powered by the Taxi Spring Boot API.</p><!--suppress HtmlUnknownTarget --><a href="/swagger-ui.html">API documentation ↗</a></footer>
-  <div class="toast" id="toast" role="status"><span></span><p></p></div>
-  <script src="/js/app.js" defer></script>
+  <main id="appView" class="app-view hidden">
+    <header class="app-topbar"><a class="brand" href="#dashboard"><span class="brand-symbol">⌁</span>wayfare</a><div class="topbar-right"><span id="apiStatus" class="connection"><i></i> Checking connection</span><button id="logoutButton" class="profile-button" type="button"><span id="profileInitial">W</span><strong id="profileName">My profile</strong><small>Log out</small></button></div></header>
+    <div class="app-layout"><aside class="side-nav"><a class="active" href="#dashboard">Overview</a><a href="#plan">Plan a ride</a><a href="#matches">My matches</a><a href="#chats">Messages</a><p>Plan your trip, review your recommendations, and connect when both travelers are ready.</p></aside>
+      <section id="dashboard" class="dashboard"><section class="dashboard-hero"><div><span class="kicker light"><i></i> YOUR TRAVEL DASHBOARD</span><h1>Good to see you,<br><em id="welcomeName">traveler.</em></h1><p>Keep your next trip moving. We’ll surface the people whose journeys genuinely align with yours.</p></div><div class="hero-route"><span class="route-pin from"></span><span class="route-path"></span><span class="route-pin to"></span><div class="route-float">Matching within <strong>50 mi</strong></div></div></section>
+        <section class="stat-grid" aria-label="Travel summary"><article><span>OPEN RIDES</span><strong id="openRideCount">0</strong><small>Your current plans</small></article><article><span>NEW MATCHES</span><strong id="pendingMatchCount">0</strong><small>Ready for your review</small></article><article><span>PRIVATE CHATS</span><strong id="chatCount">0</strong><small>Accepted connections</small></article></section>
+        <section id="plan" class="section-grid"><article class="planner-card"><div class="section-title"><div><span class="eyebrow">PLAN A RIDE</span><h2>Where are you going?</h2></div><span class="step-pill">01</span></div><form id="rideForm"><div class="location-field"><span class="location-dot pickup"></span><label>Pickup location<input name="pickupAddress" required maxlength="500" placeholder="e.g. Schaumburg, IL"></label></div><div class="route-connector"></div><div class="location-field"><span class="location-dot destination"></span><label>Destination<input name="destinationAddress" required maxlength="500" placeholder="e.g. Millennium Park, Chicago"></label></div><label class="time-label">Departure time<input id="departureTime" name="departureTime" type="datetime-local" required></label><button id="createRideButton" class="primary-button full" type="submit">Find compatible rides <span>→</span></button></form></article><article class="how-card"><span class="eyebrow">HOW IT WORKS</span><h2>A match worth making.</h2><ol><li><b>01</b><div><strong>Plan your trip</strong><span>Share where you are going and when.</span></div></li><li><b>02</b><div><strong>Review recommendations</strong><span>See travelers with compatible plans.</span></div></li><li><b>03</b><div><strong>Connect safely</strong><span>Chat opens only after both accept.</span></div></li></ol></article></section>
+        <section class="content-section" id="rides"><div class="section-title"><div><span class="eyebrow">MY RIDES</span><h2>Your travel plans</h2></div><button id="refreshRides" class="quiet-button" type="button">Refresh</button></div><div id="ridesList" class="ride-list"><div class="empty-card">No rides yet. Add your pickup, destination, and time above to begin.</div></div></section>
+        <section class="content-section" id="matches"><div class="section-title"><div><span class="eyebrow">MATCHES</span><h2>Best routes near you</h2></div><button id="refreshMatches" class="quiet-button" type="button">Refresh matches</button></div><p class="section-copy">Only compatible route information is shown until both travelers agree to connect.</p><div id="matchesList" class="match-list"><div class="empty-card">Create a ride to discover compatible travelers.</div></div></section>
+        <section class="content-section" id="chats"><div class="section-title"><div><span class="eyebrow">MESSAGES</span><h2>Your private conversations</h2></div><button id="refreshChats" class="quiet-button" type="button">Refresh</button></div><div id="chatsList" class="chat-list"><div class="empty-card">Your chats will appear after both travelers accept a match.</div></div></section>
+      </section>
+    </div>
+  </main>
+  <dialog id="chatDialog" class="chat-dialog"><div class="dialog-head"><div><span class="eyebrow">PRIVATE CHAT</span><h2>Ride coordination</h2></div><button id="closeChat" class="icon-button" type="button" aria-label="Close chat">×</button></div><div id="messagesList" class="messages-list"><div class="empty-messages">Loading conversation…</div></div><form id="messageForm" class="message-composer"><input id="messageInput" maxlength="4000" required placeholder="Write a message…"><button class="primary-button" type="submit">Send <span>↑</span></button></form></dialog>
+  <div id="toast" class="toast" role="status"><i></i><span></span></div><script src="/js/app.js" defer></script>
 </body>
 </html>

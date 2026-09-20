@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import uber.taxi.dto.chat.ChatResponse;
 import uber.taxi.dto.chat.MessageResponse;
@@ -36,37 +38,39 @@ public class ChatController {
         this.chatService = chatService;
     }
 
-    @GetMapping("/users/{userId}/chats")
-    @Operation(summary = "List a user's chats", description = "Returns chats in which the supplied user is a participant.")
+    @GetMapping("/chats/mine")
+    @Operation(summary = "List my chats", description = "Returns chats in which the authenticated user is a participant.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Chat list returned"), @ApiResponse(responseCode = "404", description = "User not found")})
-    public List<ChatResponse> getForUser(@PathVariable UUID userId) {
-        return chatService.getForUser(userId);
+    public List<ChatResponse> getForUser(@AuthenticationPrincipal Jwt jwt) {
+        return chatService.getForUser(actorId(jwt));
     }
 
     @GetMapping("/chats/{chatId}")
     @Operation(summary = "Get a chat", description = "Returns chat metadata and both participant UUIDs.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Chat found"), @ApiResponse(responseCode = "404", description = "Chat not found")})
-    public ChatResponse get(@PathVariable UUID chatId) {
-        return chatService.get(chatId);
+    public ChatResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID chatId) {
+        return chatService.get(actorId(jwt), chatId);
     }
 
     @GetMapping("/chats/{chatId}/messages")
     @Operation(summary = "List chat messages", description = "Returns a pageable message history. Defaults to 50 messages ordered by sentAt ascending. Use page and size query parameters for pagination.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Message page returned"), @ApiResponse(responseCode = "404", description = "Chat not found")})
     public Page<MessageResponse> getMessages(
-            @PathVariable UUID chatId,
+            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID chatId,
             @PageableDefault(size = 50, sort = "sentAt", direction = Sort.Direction.ASC) Pageable pageable) {
-        return chatService.getMessages(chatId, pageable);
+        return chatService.getMessages(actorId(jwt), chatId, pageable);
     }
 
     @PostMapping("/chats/{chatId}/messages")
-    @Operation(summary = "Send a chat message", description = "Creates a message when senderId belongs to this chat. Messages must contain 1–4000 non-blank characters.")
-    @ApiResponses({@ApiResponse(responseCode = "201", description = "Message sent"), @ApiResponse(responseCode = "400", description = "Validation failed or sender is not a participant"), @ApiResponse(responseCode = "404", description = "Chat or sender not found")})
-    public ResponseEntity<MessageResponse> sendMessage(@PathVariable UUID chatId,
+    @Operation(summary = "Send a chat message", description = "Creates a message from the authenticated participant. Messages must contain 1–4000 non-blank characters.")
+    @ApiResponses({@ApiResponse(responseCode = "201", description = "Message sent"), @ApiResponse(responseCode = "400", description = "Validation failed"), @ApiResponse(responseCode = "403", description = "Authenticated user is not a participant"), @ApiResponse(responseCode = "404", description = "Chat or sender not found")})
+    public ResponseEntity<MessageResponse> sendMessage(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID chatId,
                                                         @Valid @RequestBody SendMessageRequest request) {
-        MessageResponse response = chatService.sendMessage(chatId, request);
+        MessageResponse response = chatService.sendMessage(actorId(jwt), chatId, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest().path("/{messageId}")
                 .buildAndExpand(response.id()).toUri();
         return ResponseEntity.created(location).body(response);
     }
+
+    private UUID actorId(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
 }

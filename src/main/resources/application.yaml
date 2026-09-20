@@ -11,6 +11,14 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
 
 server:
   error:
@@ -31,6 +39,15 @@ logging:
     uber.taxi: INFO
 
 app:
+  security:
+    jwt:
+      secret: ${JWT_SECRET}
+      lifetime: 1h
+  email-verification:
+    from: ${SMTP_FROM:}
+    code-lifetime: 10m
+    resend-cooldown: 1m
+    maximum-attempts: 5
   google-maps:
     api-key: ${GOOGLE_MAPS_API_KEY}
     geocoding-base-url: https://geocode.googleapis.com
@@ -38,9 +55,11 @@ app:
     connect-timeout: 3s
     read-timeout: 8s
   matching:
-    maximum-pickup-deviation-meters: 15000
+    # 50 miles: a broad candidate radius. Route, destination, and departure-time scoring
+    # still decide whether two nearby riders are genuinely compatible.
+    maximum-pickup-deviation-meters: 80467
     maximum-destination-deviation-meters: 10000
-    maximum-route-pickup-deviation-meters: 10000
+    maximum-route-pickup-deviation-meters: 80467
     maximum-departure-time-difference: 30m
     route-overlap-tolerance-meters: 2000
     minimum-route-overlap: 0.25

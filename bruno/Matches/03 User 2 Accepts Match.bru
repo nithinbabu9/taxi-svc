@@ -1,23 +1,17 @@
 meta {
   name: User 2 Accepts Match and Creates Chat
   type: http
-  seq: 3
+  seq: 4
 }
 
 post {
   url: {{baseUrl}}/api/matches/{{matchId}}/accept
-  body: json
-  auth: none
+  body: none
+  auth: bearer
 }
 
-headers {
-  Content-Type: application/json
-}
-
-body:json {
-  {
-    "userId": "{{user2Id}}"
-  }
+auth:bearer {
+  token: {{user2Token}}
 }
 
 script:post-response {

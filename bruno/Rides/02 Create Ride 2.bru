@@ -7,7 +7,11 @@ meta {
 post {
   url: {{baseUrl}}/api/rides
   body: json
-  auth: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user2Token}}
 }
 
 headers {
@@ -16,7 +20,6 @@ headers {
 
 body:json {
   {
-    "userId": "{{user2Id}}",
     "pickupAddress": "Arlington Heights, IL",
     "destinationAddress": "Millennium Park, Chicago, IL",
     "departureTime": "{{departureTime}}"

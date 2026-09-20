@@ -35,6 +35,11 @@ public class GlobalExceptionHandler {
         return response(HttpStatus.BAD_REQUEST, exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    ResponseEntity<ApiErrorResponse> handleForbidden(ForbiddenException exception, HttpServletRequest request) {
+        return response(HttpStatus.FORBIDDEN, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(NoRouteFoundException.class)
     ResponseEntity<ApiErrorResponse> handleNoRoute(NoRouteFoundException exception, HttpServletRequest request) {
         return response(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage(), request, Map.of());
@@ -44,6 +49,12 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiErrorResponse> handleMapsFailure(GoogleMapsServiceException exception, HttpServletRequest request) {
         log.warn("Google Maps request failed for {}: {}", request.getRequestURI(), exception.getMessage());
         return response(exception.getResponseStatus(), exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(EmailDeliveryException.class)
+    ResponseEntity<ApiErrorResponse> handleEmailDelivery(EmailDeliveryException exception, HttpServletRequest request) {
+        log.warn("Verification email delivery failed for {}", request.getRequestURI());
+        return response(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

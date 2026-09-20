@@ -12,7 +12,7 @@ import uber.taxi.entity.RideMatch;
 import uber.taxi.entity.RideMatchStatus;
 import uber.taxi.entity.RideRequestStatus;
 import uber.taxi.exception.ConflictException;
-import uber.taxi.exception.InvalidRequestException;
+import uber.taxi.exception.ForbiddenException;
 import uber.taxi.exception.RideMatchNotFoundException;
 import uber.taxi.repository.RideMatchRepository;
 
@@ -36,7 +36,7 @@ public class MatchWorkflowService {
         try {
             fullyAccepted = match.accept(userId, Instant.now());
         } catch (IllegalArgumentException exception) {
-            throw new InvalidRequestException(exception.getMessage());
+            throw new ForbiddenException(exception.getMessage());
         } catch (IllegalStateException exception) {
             throw new ConflictException(exception.getMessage());
         }
@@ -67,7 +67,7 @@ public class MatchWorkflowService {
         try {
             match.reject(userId);
         } catch (IllegalArgumentException exception) {
-            throw new InvalidRequestException(exception.getMessage());
+            throw new ForbiddenException(exception.getMessage());
         } catch (IllegalStateException exception) {
             throw new ConflictException(exception.getMessage());
         }

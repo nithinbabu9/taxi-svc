@@ -1,21 +1,15 @@
 meta {
   name: Reject Match (Alternative Flow)
   type: http
-  seq: 4
+  seq: 5
 }
 
 post {
   url: {{baseUrl}}/api/matches/{{matchId}}/reject
-  body: json
-  auth: none
+  body: none
+  auth: bearer
 }
 
-headers {
-  Content-Type: application/json
-}
-
-body:json {
-  {
-    "userId": "{{user1Id}}"
-  }
+auth:bearer {
+  token: {{user1Token}}
 }

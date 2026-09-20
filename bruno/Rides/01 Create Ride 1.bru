@@ -7,20 +7,27 @@ meta {
 post {
   url: {{baseUrl}}/api/rides
   body: json
-  auth: none
+  auth: bearer
 }
 
 headers {
   Content-Type: application/json
 }
 
+auth:bearer {
+  token: {{user1Token}}
+}
+
 body:json {
   {
-    "userId": "{{user1Id}}",
     "pickupAddress": "Schaumburg, IL",
     "destinationAddress": "Millennium Park, Chicago, IL",
     "departureTime": "{{departureTime}}"
   }
+}
+
+vars:pre-request {
+  departureTime: 06:47:00
 }
 
 script:pre-request {

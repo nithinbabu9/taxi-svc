@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:taxi-local;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+app:
+  email-verification:
+    from: test@wayfare.test
+    code-lifetime: 10m
+    resend-cooldown: 1m
+    maximum-attempts: 5
+  security:
+    jwt:
+      secret: test-only-jwt-secret-at-least-thirty-two-bytes
+      lifetime: 1h
+  matching:
+    maximum-pickup-deviation-meters: 15000
+    maximum-destination-deviation-meters: 10000
+    maximum-route-pickup-deviation-meters: 10000
+    maximum-departure-time-difference: 30m
+    route-overlap-tolerance-meters: 2500
+    minimum-route-overlap: 0.15
+    minimum-match-score: 0.45

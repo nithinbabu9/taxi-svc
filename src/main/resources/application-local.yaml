@@ -5,7 +5,17 @@ spring:
     username: ${DATABASE_USERNAME:nithin}
     password: ${DATABASE_PASSWORD:}
 
+management:
+  health:
+    mail:
+      enabled: false
+
 app:
+  email-verification:
+    from: local@wayfare.test
+  security:
+    jwt:
+      secret: ${JWT_SECRET:local-development-secret-change-me-123456789}
   matching:
     # Offline routes are straight-line fixtures and naturally have less overlap than road geometry.
     minimum-route-overlap: 0.20
