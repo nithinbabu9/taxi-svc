@@ -7,8 +7,9 @@ spring:
       # when Cloud Run starts more than one request-handling thread.
       maximum-pool-size: ${DATABASE_MAXIMUM_POOL_SIZE:3}
       minimum-idle: 0
-      connection-timeout: 10s
-      max-lifetime: 25m
+      # HikariCP interprets these values as milliseconds.
+      connection-timeout: 10000
+      max-lifetime: 1500000
   jpa:
     properties:
       hibernate.jdbc.time_zone: UTC
