@@ -34,4 +34,12 @@ class LocalMapsClientTest {
         assertThat(first.formattedAddress()).isEqualTo("123 Example Street");
         assertThat(first.placeId()).isEqualTo(second.placeId());
     }
+
+    @Test
+    void suggestsKnownLocationsForLocalAutocomplete() {
+        assertThat(client.autocomplete("schaum"))
+                .singleElement()
+                .extracting(PlaceSuggestion::description)
+                .isEqualTo("schaumburg, il");
+    }
 }

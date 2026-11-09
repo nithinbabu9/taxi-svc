@@ -23,6 +23,11 @@ public class GoogleMapsConfig {
         return createClient(builder, properties.routesBaseUrl().toString(), properties);
     }
 
+    @Bean("googlePlacesRestClient")
+    RestClient googlePlacesRestClient(RestClient.Builder builder, GoogleMapsProperties properties) {
+        return createClient(builder, properties.placesBaseUrl().toString(), properties);
+    }
+
     private RestClient createClient(RestClient.Builder builder, String baseUrl, GoogleMapsProperties properties) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(toMillis(properties.connectTimeout()));

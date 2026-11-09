@@ -39,6 +39,7 @@ build/
 .env
 .env.*
 !.env.example
+gha-creds-*.json
 application-secrets.yaml
 *.local.yaml
 

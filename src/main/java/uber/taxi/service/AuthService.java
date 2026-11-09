@@ -14,11 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 import uber.taxi.config.JwtProperties;
 import uber.taxi.config.EmailVerificationProperties;
 import uber.taxi.dto.auth.AuthResponse;
+import uber.taxi.dto.auth.ForgotPasswordRequest;
 import uber.taxi.dto.auth.LoginRequest;
 import uber.taxi.dto.auth.RegisterRequest;
+import uber.taxi.dto.auth.ResetPasswordRequest;
 import uber.taxi.dto.auth.VerificationCodeRequest;
 import uber.taxi.dto.auth.VerificationPendingResponse;
 import uber.taxi.entity.EmailVerificationToken;
+import uber.taxi.entity.PasswordResetToken;
 import uber.taxi.entity.User;
 import uber.taxi.exception.ConflictException;
 import uber.taxi.exception.ForbiddenException;
@@ -26,12 +29,14 @@ import uber.taxi.exception.InvalidRequestException;
 import uber.taxi.mapper.UserMapper;
 import uber.taxi.repository.UserRepository;
 import uber.taxi.repository.EmailVerificationTokenRepository;
+import uber.taxi.repository.PasswordResetTokenRepository;
 
 @Service
 public class AuthService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private final UserRepository users;
     private final EmailVerificationTokenRepository verificationTokens;
+    private final PasswordResetTokenRepository passwordResetTokens;
     private final PasswordEncoder passwords;
     private final JwtEncoder jwtEncoder;
     private final JwtProperties properties;
@@ -40,11 +45,13 @@ public class AuthService {
     private final EmailVerificationSender emailSender;
 
     public AuthService(UserRepository users, EmailVerificationTokenRepository verificationTokens,
+                       PasswordResetTokenRepository passwordResetTokens,
                        PasswordEncoder passwords, JwtEncoder jwtEncoder, JwtProperties properties,
                        EmailVerificationProperties emailProperties, EmailVerificationSender emailSender,
                        UserMapper userMapper) {
         this.users = users;
         this.verificationTokens = verificationTokens;
+        this.passwordResetTokens = passwordResetTokens;
         this.passwords = passwords;
         this.jwtEncoder = jwtEncoder;
         this.properties = properties;
@@ -121,6 +128,38 @@ public class AuthService {
         return issueVerificationCode(user);
     }
 
+    @Transactional
+    public VerificationPendingResponse requestPasswordReset(ForgotPasswordRequest request) {
+        String email = normalize(request.email());
+        Instant expiresAt = Instant.now().plus(emailProperties.codeLifetime());
+        users.findByEmailIgnoreCase(email).ifPresent(user -> issuePasswordResetCode(user, expiresAt));
+        // Do not disclose whether an account exists for the supplied email address.
+        return new VerificationPendingResponse(email, expiresAt, true);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = users.findByEmailIgnoreCase(normalize(request.email()))
+                .orElseThrow(() -> new InvalidRequestException("Invalid or expired password reset code"));
+        PasswordResetToken token = passwordResetTokens.findById(user.getId())
+                .orElseThrow(() -> new InvalidRequestException("Invalid or expired password reset code"));
+        if (Instant.now().isAfter(token.getExpiresAt())) {
+            passwordResetTokens.delete(token);
+            throw new InvalidRequestException("Password reset code has expired. Request a new code.");
+        }
+        if (token.getAttempts() >= emailProperties.maximumAttempts()) {
+            throw new InvalidRequestException("Too many incorrect attempts. Request a new code.");
+        }
+        if (!passwords.matches(request.code(), token.getCodeHash())) {
+            token.recordFailedAttempt();
+            passwordResetTokens.save(token);
+            throw new InvalidRequestException("Invalid or expired password reset code");
+        }
+        user.changePassword(passwords.encode(request.newPassword()));
+        users.save(user);
+        passwordResetTokens.delete(token);
+    }
+
     private VerificationPendingResponse issueVerificationCode(User user) {
         Instant sentAt = Instant.now();
         Instant expiresAt = sentAt.plus(emailProperties.codeLifetime());
@@ -131,6 +170,15 @@ public class AuthService {
                 () -> verificationTokens.save(new EmailVerificationToken(user.getId(), codeHash, expiresAt, sentAt)));
         emailSender.sendVerificationCode(user.getEmail(), code, expiresAt);
         return new VerificationPendingResponse(user.getEmail(), expiresAt, true);
+    }
+
+    private void issuePasswordResetCode(User user, Instant expiresAt) {
+        String code = String.format("%06d", RANDOM.nextInt(1_000_000));
+        String codeHash = passwords.encode(code);
+        passwordResetTokens.findById(user.getId()).ifPresentOrElse(
+                token -> token.replaceCode(codeHash, expiresAt),
+                () -> passwordResetTokens.save(new PasswordResetToken(user.getId(), codeHash, expiresAt)));
+        emailSender.sendPasswordResetCode(user.getEmail(), code, expiresAt);
     }
 
     private AuthResponse tokenFor(User user) {

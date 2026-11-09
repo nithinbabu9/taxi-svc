@@ -30,18 +30,54 @@ public class GoogleMapsClient implements MapsClient {
     private static final String API_KEY_HEADER = "X-Goog-Api-Key";
     private static final String ROUTE_FIELD_MASK =
             "routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline";
+    private static final String AUTOCOMPLETE_FIELD_MASK =
+            "suggestions.placePrediction.placeId,suggestions.placePrediction.text.text";
 
     private final RestClient geocodingClient;
     private final RestClient routesClient;
+    private final RestClient placesClient;
     private final GoogleMapsProperties properties;
 
     public GoogleMapsClient(
             @Qualifier("googleGeocodingRestClient") RestClient geocodingClient,
             @Qualifier("googleRoutesRestClient") RestClient routesClient,
+            @Qualifier("googlePlacesRestClient") RestClient placesClient,
             GoogleMapsProperties properties) {
         this.geocodingClient = geocodingClient;
         this.routesClient = routesClient;
+        this.placesClient = placesClient;
         this.properties = properties;
+    }
+
+    @Override
+    public List<PlaceSuggestion> autocomplete(String input) {
+        try {
+            AutocompleteResponse response = placesClient.post()
+                    .uri("/v1/places:autocomplete")
+                    .header(API_KEY_HEADER, properties.apiKey())
+                    .header("X-Goog-FieldMask", AUTOCOMPLETE_FIELD_MASK)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .body(new AutocompleteRequest(input, "US", "en"))
+                    .retrieve()
+                    .body(AutocompleteResponse.class);
+            if (response == null || response.suggestions() == null) {
+                return List.of();
+            }
+            return response.suggestions().stream()
+                    .map(AutocompleteSuggestion::placePrediction)
+                    .filter(prediction -> prediction != null && prediction.placeId() != null
+                            && prediction.text() != null && prediction.text().text() != null)
+                    .map(prediction -> new PlaceSuggestion(prediction.placeId(), prediction.text().text()))
+                    .limit(5)
+                    .toList();
+        } catch (RestClientResponseException exception) {
+            throw mapHttpFailure("address autocomplete", exception);
+        } catch (ResourceAccessException exception) {
+            throw unavailable("Google address autocomplete timed out or could not be reached", exception);
+        } catch (RestClientException exception) {
+            throw malformed("Google returned a malformed address autocomplete response", exception);
+        }
     }
 
     @Override
@@ -151,6 +187,20 @@ public class GoogleMapsClient implements MapsClient {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record GeocodeResult(String placeId, String formattedAddress, LatLng location) { }
+
+    record AutocompleteRequest(String input, String regionCode, String languageCode) { }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record AutocompleteResponse(List<AutocompleteSuggestion> suggestions) { }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record AutocompleteSuggestion(PlacePrediction placePrediction) { }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record PlacePrediction(String placeId, TextValue text) { }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record TextValue(String text) { }
 
     record RouteRequest(Waypoint origin, Waypoint destination, String travelMode, String routingPreference,
                         boolean computeAlternativeRoutes, String departureTime, String languageCode, String units) { }

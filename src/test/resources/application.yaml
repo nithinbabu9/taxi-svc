@@ -23,6 +23,7 @@ app:
     api-key: test-key-not-used
     geocoding-base-url: https://geocode.test
     routes-base-url: https://routes.test
+    places-base-url: https://places.test
     connect-timeout: 1s
     read-timeout: 1s
   matching:

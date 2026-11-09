@@ -24,17 +24,27 @@ public class SmtpEmailVerificationSender implements EmailVerificationSender {
 
     @Override
     public void sendVerificationCode(String recipient, String code, Instant expiresAt) {
+        send(recipient, "Your Wayfare verification code", "Your Wayfare verification code is " + code
+                + ". It expires at " + expiresAt + ". If you did not create this account, you can ignore this email.");
+    }
+
+    @Override
+    public void sendPasswordResetCode(String recipient, String code, Instant expiresAt) {
+        send(recipient, "Reset your Wayfare password", "Your Wayfare password reset code is " + code
+                + ". It expires at " + expiresAt + ". If you did not request a password reset, you can ignore this email.");
+    }
+
+    private void send(String recipient, String subject, String text) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
             message.setFrom(properties.from());
             message.setTo(recipient);
-            message.setSubject("Your Wayfare verification code");
-            message.setText("Your Wayfare verification code is " + code + ". It expires at " + expiresAt
-                    + ". If you did not create this account, you can ignore this email.");
+            message.setSubject(subject);
+            message.setText(text);
             mailSender.send(message);
         } catch (RuntimeException exception) {
-            log.warn("SMTP verification email delivery failed: {}", exception.getMessage());
-            throw new EmailDeliveryException("Unable to send the verification email", exception);
+            log.warn("SMTP email delivery failed: {}", exception.getMessage());
+            throw new EmailDeliveryException("Unable to send the email", exception);
         }
     }
 }

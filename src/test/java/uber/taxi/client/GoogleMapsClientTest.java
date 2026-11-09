@@ -28,17 +28,21 @@ class GoogleMapsClientTest {
 
     private MockRestServiceServer geocodingServer;
     private MockRestServiceServer routesServer;
+    private MockRestServiceServer placesServer;
     private GoogleMapsClient client;
 
     @BeforeEach
     void setUp() {
         RestClient.Builder geocodingBuilder = RestClient.builder().baseUrl("https://geocode.test");
         RestClient.Builder routesBuilder = RestClient.builder().baseUrl("https://routes.test");
+        RestClient.Builder placesBuilder = RestClient.builder().baseUrl("https://places.test");
         geocodingServer = MockRestServiceServer.bindTo(geocodingBuilder).build();
         routesServer = MockRestServiceServer.bindTo(routesBuilder).build();
+        placesServer = MockRestServiceServer.bindTo(placesBuilder).build();
         GoogleMapsProperties properties = new GoogleMapsProperties("maps-key", URI.create("https://geocode.test"),
-                URI.create("https://routes.test"), Duration.ofSeconds(1), Duration.ofSeconds(1));
-        client = new GoogleMapsClient(geocodingBuilder.build(), routesBuilder.build(), properties);
+                URI.create("https://routes.test"), URI.create("https://places.test"),
+                Duration.ofSeconds(1), Duration.ofSeconds(1));
+        client = new GoogleMapsClient(geocodingBuilder.build(), routesBuilder.build(), placesBuilder.build(), properties);
     }
 
     @Test
@@ -105,5 +109,21 @@ class GoogleMapsClientTest {
         GeocodedLocation point = new GeocodedLocation("Point", "p", BigDecimal.ONE, BigDecimal.ONE);
         assertThrows(NoRouteFoundException.class,
                 () -> client.computeDrivingRoute(point, point, Instant.parse("2027-01-01T12:00:00Z")));
+    }
+
+    @Test
+    void returnsOnlyPlacePredictionsFromAutocomplete() {
+        placesServer.expect(requestTo("https://places.test/v1/places:autocomplete"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("X-Goog-Api-Key", "maps-key"))
+                .andRespond(withSuccess("""
+                        {"suggestions":[{"placePrediction":{"placeId":"place-1","text":{"text":"Schaumburg, IL, USA"}}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        var suggestions = client.autocomplete("Schaumburg");
+
+        assertEquals(1, suggestions.size());
+        assertEquals("Schaumburg, IL, USA", suggestions.getFirst().description());
+        placesServer.verify();
     }
 }

@@ -25,6 +25,7 @@ import uber.taxi.repository.ChatParticipantRepository;
 import uber.taxi.repository.ChatRepository;
 import uber.taxi.repository.EmailVerificationTokenRepository;
 import uber.taxi.repository.MessageRepository;
+import uber.taxi.repository.PasswordResetTokenRepository;
 import uber.taxi.repository.RideMatchRepository;
 import uber.taxi.repository.RideRequestRepository;
 import uber.taxi.repository.UserRepository;
@@ -46,6 +47,7 @@ class AuthenticatedWorkflowIntegrationTest {
     @Autowired private RideRequestRepository rides;
     @Autowired private UserRepository users;
     @Autowired private EmailVerificationTokenRepository verificationTokens;
+    @Autowired private PasswordResetTokenRepository passwordResetTokens;
     @Autowired private LocalEmailVerificationSender localEmailSender;
 
     @BeforeEach
@@ -56,6 +58,7 @@ class AuthenticatedWorkflowIntegrationTest {
         matches.deleteAll();
         rides.deleteAll();
         verificationTokens.deleteAll();
+        passwordResetTokens.deleteAll();
         users.deleteAll();
     }
 
@@ -159,6 +162,38 @@ class AuthenticatedWorkflowIntegrationTest {
                         .content("{\"email\":\"test@example.com\",\"password\":\"Password123!\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors.email").value("must be a valid @gmail.com address"));
+    }
+
+    @Test
+    void verifiedTravelerCanResetPasswordWithAnEmailedCode() throws Exception {
+        String email = "reset.traveler@gmail.com";
+        register(email, "Reset", "Traveler");
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"" + email + "\"}"))
+                .andExpect(status().isAccepted());
+        String code = localEmailSender.latestCodeFor(email);
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"code\":\"" + code
+                                + "\",\"newPassword\":\"UpdatedPassword123!\"}"))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"UpdatedPassword123!\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void authenticatedTravelerCanGetAddressSuggestions() throws Exception {
+        AuthenticatedUser traveler = register("locations.traveler@gmail.com", "Location", "Traveler");
+
+        mockMvc.perform(get("/api/locations/autocomplete").param("input", "schaum")
+                        .header("Authorization", bearer(traveler.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].description").value("schaumburg, il"));
     }
 
     private AuthenticatedUser register(String email, String firstName, String lastName) throws Exception {

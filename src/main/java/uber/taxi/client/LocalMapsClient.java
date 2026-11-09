@@ -44,6 +44,16 @@ public class LocalMapsClient implements MapsClient {
     }
 
     @Override
+    public List<PlaceSuggestion> autocomplete(String input) {
+        String query = input.strip().toLowerCase(Locale.ROOT);
+        return KNOWN_LOCATIONS.keySet().stream()
+                .filter(address -> address.contains(query))
+                .limit(5)
+                .map(address -> new PlaceSuggestion("local-" + Integer.toUnsignedString(address.hashCode()), address))
+                .toList();
+    }
+
+    @Override
     public GeocodedLocation geocode(String address) {
         String normalized = address.strip().toLowerCase(Locale.ROOT);
         Coordinates coordinates = KNOWN_LOCATIONS.getOrDefault(normalized, fallbackCoordinates(normalized));

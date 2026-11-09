@@ -13,6 +13,7 @@ public record GoogleMapsProperties(
         @NotBlank String apiKey,
         @NotNull URI geocodingBaseUrl,
         @NotNull URI routesBaseUrl,
+        @NotNull URI placesBaseUrl,
         @NotNull Duration connectTimeout,
         @NotNull Duration readTimeout
 ) {

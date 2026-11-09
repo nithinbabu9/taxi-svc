@@ -15,6 +15,7 @@ tags:
   - name: Rides
   - name: Matches
   - name: Chats
+  - name: Locations
 paths:
   /api/auth/register:
     post:
@@ -44,6 +45,33 @@ paths:
         '200': {description: Logged in, content: {application/json: {schema: {$ref: '#/components/schemas/AuthResponse'}}}}
         '401': {description: Invalid email or password}
         '403': {description: Email address has not yet been verified}
+  /api/auth/forgot-password:
+    post:
+      tags: [Authentication]
+      summary: Send a password reset code
+      description: Returns an accepted response whether or not the account exists, to avoid revealing registered email addresses.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ForgotPasswordRequest'}
+      responses:
+        '202': {description: Password reset email accepted, content: {application/json: {schema: {$ref: '#/components/schemas/VerificationPendingResponse'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /api/auth/reset-password:
+    post:
+      tags: [Authentication]
+      summary: Reset a password with a six-digit emailed code
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ResetPasswordRequest'}
+      responses:
+        '204': {description: Password changed}
+        '400': {description: Invalid, expired, or exhausted reset code}
   /api/auth/verify-email:
     post:
       tags: [Authentication]
@@ -76,6 +104,15 @@ paths:
       summary: Get the authenticated traveler
       responses:
         '200': {description: Traveler profile, content: {application/json: {schema: {$ref: '#/components/schemas/UserResponse'}}}}
+  /api/locations/autocomplete:
+    get:
+      tags: [Locations]
+      summary: Suggest addresses for the authenticated traveler
+      parameters:
+        - {name: input, in: query, required: true, schema: {type: string, minLength: 3, maxLength: 200}, description: Partial pickup or destination address}
+      responses:
+        '200': {description: Up to five address suggestions, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/LocationSuggestionResponse'}}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
   /api/rides:
     get:
       tags: [Rides]
@@ -233,6 +270,18 @@ components:
       required: [email]
       properties:
         email: {type: string, format: email, example: nithin@gmail.com}
+    ForgotPasswordRequest:
+      type: object
+      required: [email]
+      properties:
+        email: {type: string, format: email, example: nithin@gmail.com, description: Gmail address only}
+    ResetPasswordRequest:
+      type: object
+      required: [email, code, newPassword]
+      properties:
+        email: {type: string, format: email, example: nithin@gmail.com}
+        code: {type: string, pattern: '^[0-9]{6}$', example: '123456'}
+        newPassword: {type: string, format: password, minLength: 12, maxLength: 72, writeOnly: true}
     VerificationPendingResponse:
       type: object
       properties:
@@ -256,6 +305,11 @@ components:
         phoneNumber: {type: string}
         createdAt: {type: string, format: date-time}
         updatedAt: {type: string, format: date-time}
+    LocationSuggestionResponse:
+      type: object
+      properties:
+        placeId: {type: string, description: Google place identifier}
+        description: {type: string, example: 'Millennium Park, 201 E Randolph St, Chicago, IL 60602, USA'}
     CreateRideRequest:
       type: object
       required: [pickupAddress, destinationAddress, departureTime]

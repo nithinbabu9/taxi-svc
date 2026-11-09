@@ -7,6 +7,9 @@ let matches = [];
 let chats = [];
 let activeChatId = null;
 let verificationEmail = null;
+let passwordResetEmail = null;
+const autocompleteTimers = new Map();
+const autocompleteControllers = new Map();
 
 function persist() { localStorage.setItem(sessionKey, JSON.stringify(state)); }
 function clearSession() { Object.keys(state).forEach(key => delete state[key]); localStorage.removeItem(sessionKey); }
@@ -32,6 +35,7 @@ function setAuthMode(mode) {
   $('authSubtitle').textContent = registering ? 'Create your account and find better ways to travel.' : 'Log in to continue planning better trips.';
   $('authSubmit').innerHTML = `${registering ? 'Create my account' : 'Log in'} <span>→</span>`;
   $('authFoot').textContent = registering ? 'Already have an account? Switch to Log in.' : 'New here? Create an account in less than a minute.';
+  $('forgotPasswordButton').classList.toggle('hidden', registering);
 }
 function showVerification(email) {
   verificationEmail = email;
@@ -44,6 +48,22 @@ function hideVerification() {
   verificationEmail = null;
   $('verificationForm').classList.add('hidden'); $('authForm').classList.remove('hidden'); $('authSwitch').classList.remove('hidden');
   $('authFoot').classList.remove('hidden'); setAuthMode('login');
+}
+function showForgotPassword() {
+  $('authForm').classList.add('hidden'); $('authSwitch').classList.add('hidden'); $('forgotPasswordForm').classList.remove('hidden');
+  $('authTitle').textContent = 'Let’s get you back in'; $('authSubtitle').textContent = 'We’ll send a secure reset code to your verified Gmail.';
+  $('authFoot').classList.add('hidden'); $('forgotPasswordEmail').value = $('emailInput').value.trim(); $('forgotPasswordEmail').focus();
+}
+function showResetPassword(email) {
+  passwordResetEmail = email;
+  $('forgotPasswordForm').classList.add('hidden'); $('resetPasswordForm').classList.remove('hidden');
+  $('resetPasswordHelp').textContent = `Enter the code sent to ${email} and choose a new password.`;
+  $('resetPasswordCode').value = ''; $('newPassword').value = ''; $('resetPasswordCode').focus();
+}
+function hidePasswordReset() {
+  passwordResetEmail = null;
+  $('forgotPasswordForm').classList.add('hidden'); $('resetPasswordForm').classList.add('hidden');
+  $('authForm').classList.remove('hidden'); $('authSwitch').classList.remove('hidden'); $('authFoot').classList.remove('hidden'); setAuthMode('login');
 }
 function showPublic() { $('publicView').classList.remove('hidden'); $('appView').classList.add('hidden'); }
 function showApp() { $('publicView').classList.add('hidden'); $('appView').classList.remove('hidden'); renderProfile(); refreshDashboard(); }
@@ -93,6 +113,27 @@ async function createRide(event) {
   button.disabled = true; button.innerHTML = 'Resolving your route…';
   try { data.departureTime = new Date(data.departureTime).toISOString(); await api('/api/rides', { method: 'POST', body: JSON.stringify(data) }); $('rideForm').reset(); $('departureTime').value = defaultDeparture(); await refreshDashboard(); toast('Your ride is live. We’re checking compatible routes.'); }
   catch (error) { toast(error.message, true); } finally { button.disabled = false; button.innerHTML = 'Find compatible rides <span>→</span>'; }
+}
+function hideSuggestions(container) { container.classList.add('hidden'); container.innerHTML = ''; }
+function configureAddressAutocomplete(inputId, suggestionsId) {
+  const input = $(inputId); const container = $(suggestionsId);
+  input.addEventListener('input', () => {
+    clearTimeout(autocompleteTimers.get(inputId));
+    const query = input.value.trim();
+    if (query.length < 3) { hideSuggestions(container); return; }
+    autocompleteTimers.set(inputId, setTimeout(async () => {
+      autocompleteControllers.get(inputId)?.abort();
+      const controller = new AbortController(); autocompleteControllers.set(inputId, controller);
+      try {
+        const suggestions = await api(`/api/locations/autocomplete?input=${encodeURIComponent(query)}`, { signal: controller.signal });
+        if (input.value.trim() !== query || !suggestions.length) { hideSuggestions(container); return; }
+        container.innerHTML = `${suggestions.map(suggestion => `<button type="button" role="option" data-address="${escapeHtml(suggestion.description)}">${escapeHtml(suggestion.description)}</button>`).join('')}<div class="google-attribution"><img src="https://www.gstatic.com/images/branding/googlelogo/1x/googlelogo_color_42x16dp.png" alt="Google"></div>`;
+        container.classList.remove('hidden');
+        container.querySelectorAll('[data-address]').forEach(button => button.addEventListener('click', () => { input.value = button.dataset.address; hideSuggestions(container); input.focus(); }));
+      } catch (error) { if (error.name !== 'AbortError') hideSuggestions(container); }
+    }, 280));
+  });
+  input.addEventListener('blur', () => setTimeout(() => hideSuggestions(container), 150));
 }
 async function cancelRide(rideId) { if (!window.confirm('Cancel this ride? Pending matches will also be cancelled.')) return; try { await api(`/api/rides/${rideId}`, { method: 'DELETE' }); await refreshDashboard(); toast('Ride cancelled'); } catch (error) { toast(error.message, true); } }
 async function decideMatch(matchId, action) { try { const result = await api(`/api/matches/${matchId}/${action}`, { method: 'POST' }); await refreshDashboard(); if (result.chatId) { toast('Both travelers accepted. Your chat is ready.'); await openChat(result.chatId); } else toast(action === 'accept' ? 'Accepted. Waiting for the other traveler.' : 'Match declined'); } catch (error) { toast(error.message, true); } }
@@ -148,8 +189,27 @@ async function resendVerification() {
   try { await api('/api/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email: verificationEmail }) }); toast('A new verification code has been sent.'); }
   catch (error) { toast(validationMessage(error), true); } finally { button.disabled = false; }
 }
+async function requestPasswordReset(event) {
+  event.preventDefault(); const form = $('forgotPasswordForm');
+  if (!form.reportValidity()) return;
+  const email = $('forgotPasswordEmail').value.trim();
+  if (!isGmailAddress(email)) { toast('Enter a valid @gmail.com address.', true); return; }
+  const button = form.querySelector('[type="submit"]'); button.disabled = true;
+  try { await api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }); showResetPassword(email); toast('If an account exists, a reset code has been sent.'); }
+  catch (error) { toast(validationMessage(error), true); } finally { button.disabled = false; }
+}
+async function resetPassword(event) {
+  event.preventDefault(); const form = $('resetPasswordForm');
+  if (!form.reportValidity() || !passwordResetEmail) return;
+  const code = $('resetPasswordCode').value.trim(); const newPassword = $('newPassword').value;
+  if (!/^\d{6}$/.test(code)) { toast('Enter the six-digit code from your email.', true); return; }
+  const button = form.querySelector('[type="submit"]'); button.disabled = true;
+  try { const email = passwordResetEmail; await api('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ email, code, newPassword }) }); hidePasswordReset(); $('emailInput').value = email; toast('Password updated. You can now log in.'); }
+  catch (error) { toast(validationMessage(error), true); } finally { button.disabled = false; }
+}
 
 $('loginTab').addEventListener('click', () => setAuthMode('login')); $('registerTab').addEventListener('click', () => setAuthMode('register'));
 $('passwordToggle').addEventListener('click', () => { const input = $('passwordInput'); const showing = input.type === 'text'; input.type = showing ? 'password' : 'text'; $('passwordToggle').setAttribute('aria-label', showing ? 'Show password' : 'Hide password'); });
-$('authForm').addEventListener('submit', authenticate); $('verificationForm').addEventListener('submit', verifyEmail); $('resendButton').addEventListener('click', resendVerification); $('backToAuthButton').addEventListener('click', hideVerification); $('rideForm').addEventListener('submit', createRide); $('refreshRides').addEventListener('click', refreshDashboard); $('refreshMatches').addEventListener('click', refreshDashboard); $('refreshChats').addEventListener('click', refreshDashboard); $('messageForm').addEventListener('submit', sendMessage); $('closeChat').addEventListener('click', () => $('chatDialog').close()); $('logoutButton').addEventListener('click', () => { clearSession(); showPublic(); setAuthMode('login'); toast('You have been logged out.'); });
+$('authForm').addEventListener('submit', authenticate); $('verificationForm').addEventListener('submit', verifyEmail); $('resendButton').addEventListener('click', resendVerification); $('backToAuthButton').addEventListener('click', hideVerification); $('forgotPasswordButton').addEventListener('click', showForgotPassword); $('forgotPasswordForm').addEventListener('submit', requestPasswordReset); $('resetPasswordForm').addEventListener('submit', resetPassword); $('backFromForgotButton').addEventListener('click', hidePasswordReset); $('backFromResetButton').addEventListener('click', hidePasswordReset); $('rideForm').addEventListener('submit', createRide); $('refreshRides').addEventListener('click', refreshDashboard); $('refreshMatches').addEventListener('click', refreshDashboard); $('refreshChats').addEventListener('click', refreshDashboard); $('messageForm').addEventListener('submit', sendMessage); $('closeChat').addEventListener('click', () => $('chatDialog').close()); $('logoutButton').addEventListener('click', () => { clearSession(); showPublic(); setAuthMode('login'); toast('You have been logged out.'); });
+$('pickupAddress') && configureAddressAutocomplete('pickupAddress', 'pickupSuggestions'); $('destinationAddress') && configureAddressAutocomplete('destinationAddress', 'destinationSuggestions');
 $('departureTime').value = defaultDeparture(); checkHealth(); if (state.token && state.user) showApp(); else showPublic();

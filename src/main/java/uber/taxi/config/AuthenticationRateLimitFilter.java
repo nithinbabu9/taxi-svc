@@ -24,7 +24,9 @@ public class AuthenticationRateLimitFilter extends OncePerRequestFilter {
             "/api/auth/register", new Limit(5, Duration.ofMinutes(15)),
             "/api/auth/login", new Limit(10, Duration.ofMinutes(15)),
             "/api/auth/verify-email", new Limit(10, Duration.ofMinutes(15)),
-            "/api/auth/resend-verification", new Limit(3, Duration.ofMinutes(15)));
+            "/api/auth/resend-verification", new Limit(3, Duration.ofMinutes(15)),
+            "/api/auth/forgot-password", new Limit(3, Duration.ofMinutes(15)),
+            "/api/auth/reset-password", new Limit(10, Duration.ofMinutes(15)));
 
     private final Map<String, Window> windows = new ConcurrentHashMap<>();
 

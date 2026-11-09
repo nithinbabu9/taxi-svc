@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import uber.taxi.dto.auth.AuthResponse;
+import uber.taxi.dto.auth.ForgotPasswordRequest;
 import uber.taxi.dto.auth.LoginRequest;
 import uber.taxi.dto.auth.RegisterRequest;
+import uber.taxi.dto.auth.ResetPasswordRequest;
 import uber.taxi.dto.auth.ResendVerificationRequest;
 import uber.taxi.dto.auth.VerificationCodeRequest;
 import uber.taxi.dto.auth.VerificationPendingResponse;
@@ -57,5 +59,19 @@ public class AuthController {
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Logged in"), @ApiResponse(responseCode = "401", description = "Invalid email or password")})
     public AuthResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/forgot-password")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Request a password reset code")
+    public VerificationPendingResponse forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return authService.requestPasswordReset(request);
+    }
+
+    @PostMapping("/reset-password")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Reset a password using an emailed six-digit code")
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
     }
 }

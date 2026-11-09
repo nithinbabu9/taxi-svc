@@ -20,6 +20,12 @@ public class LocalEmailVerificationSender implements EmailVerificationSender {
         log.info("LOCAL ONLY email verification code for {}: {} (expires {})", recipient, code, expiresAt);
     }
 
+    @Override
+    public void sendPasswordResetCode(String recipient, String code, Instant expiresAt) {
+        latestCodes.put(recipient, code);
+        log.info("LOCAL ONLY password reset code for {}: {} (expires {})", recipient, code, expiresAt);
+    }
+
     public String latestCodeFor(String recipient) {
         return latestCodes.get(recipient);
     }

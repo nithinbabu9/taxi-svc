@@ -1,0 +1,40 @@
+.auth-link { display: block; margin: 14px auto 0; }
+
+.address-autocomplete { position: relative; }
+
+.address-suggestions {
+  position: absolute;
+  z-index: 12;
+  right: 0;
+  left: 0;
+  top: calc(100% + 5px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(18, 59, 49, .14);
+}
+
+.address-suggestions button {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: #fff;
+  padding: 11px 13px;
+  color: var(--ink);
+  cursor: pointer;
+  font: 500 13px "DM Sans", sans-serif;
+  text-align: left;
+}
+
+.address-suggestions button:hover { background: var(--mint); }
+
+.google-attribution {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #edf0ed;
+  background: #fafafa;
+  padding: 6px 10px;
+}
+
+.google-attribution img { width: 42px; height: 16px; object-fit: contain; }
