@@ -23,6 +23,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import uber.taxi.repository.ChatParticipantRepository;
 import uber.taxi.repository.ChatRepository;
+import uber.taxi.repository.AppNotificationRepository;
 import uber.taxi.repository.EmailVerificationTokenRepository;
 import uber.taxi.repository.MessageRepository;
 import uber.taxi.repository.PasswordResetTokenRepository;
@@ -49,9 +50,11 @@ class AuthenticatedWorkflowIntegrationTest {
     @Autowired private EmailVerificationTokenRepository verificationTokens;
     @Autowired private PasswordResetTokenRepository passwordResetTokens;
     @Autowired private LocalEmailVerificationSender localEmailSender;
+    @Autowired private AppNotificationRepository notifications;
 
     @BeforeEach
     void clearDatabase() {
+        notifications.deleteAll();
         messages.deleteAll();
         participants.deleteAll();
         chats.deleteAll();
@@ -97,6 +100,11 @@ class AuthenticatedWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.chatId").doesNotExist());
 
+        mockMvc.perform(get("/api/notifications").header("Authorization", bearer(travelerB.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].type").value("MATCH_ACCEPTED"));
+
         MvcResult secondAcceptance = mockMvc.perform(post("/api/matches/{matchId}/accept", matchId)
                         .header("Authorization", bearer(travelerB.token())))
                 .andExpect(status().isOk())
@@ -104,6 +112,10 @@ class AuthenticatedWorkflowIntegrationTest {
                 .andExpect(jsonPath("$.chatId").isNotEmpty())
                 .andReturn();
         UUID chatId = UUID.fromString(json(secondAcceptance).at("/chatId").asText());
+
+        mockMvc.perform(get("/api/notifications").header("Authorization", bearer(travelerA.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("CHAT_READY"));
 
         mockMvc.perform(get("/api/chats/{chatId}", chatId).header("Authorization", bearer(outsider.token())))
                 .andExpect(status().isForbidden());
@@ -119,6 +131,10 @@ class AuthenticatedWorkflowIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.senderId").value(travelerA.id().toString()))
                 .andExpect(jsonPath("$.message").value("See you at the pickup point"));
+        mockMvc.perform(get("/api/notifications").header("Authorization", bearer(travelerB.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].type").value("NEW_MESSAGE"))
+                .andExpect(jsonPath("$[0].chatId").value(chatId.toString()));
         mockMvc.perform(get("/api/chats/{chatId}/messages", chatId)
                         .header("Authorization", bearer(travelerB.token())))
                 .andExpect(status().isOk())
@@ -194,6 +210,11 @@ class AuthenticatedWorkflowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].description").value("schaumburg, il"));
+
+        mockMvc.perform(get("/api/locations/current").param("latitude", "42.0334")
+                        .param("longitude", "-88.0834").header("Authorization", bearer(traveler.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.description").value("schaumburg, il"));
     }
 
     private AuthenticatedUser register(String email, String firstName, String lastName) throws Exception {

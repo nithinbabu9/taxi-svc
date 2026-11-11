@@ -33,12 +33,14 @@ class MatchWorkflowServiceTest {
     private RideMatchRepository matchRepository;
     @Mock
     private ChatService chatService;
+    @Mock
+    private NotificationService notificationService;
 
     private MatchWorkflowService service;
 
     @BeforeEach
     void setUp() {
-        service = new MatchWorkflowService(matchRepository, chatService);
+        service = new MatchWorkflowService(matchRepository, chatService, notificationService);
     }
 
     @Test
@@ -61,6 +63,10 @@ class MatchWorkflowServiceTest {
         assertEquals(chat.getId(), secondAcceptance.chatId());
         assertEquals(RideRequestStatus.MATCHED, match.getRideRequest1().getStatus());
         assertEquals(RideRequestStatus.MATCHED, match.getRideRequest2().getStatus());
+        verify(notificationService).notifyMatchAccepted(org.mockito.ArgumentMatchers.any(User.class),
+                org.mockito.ArgumentMatchers.same(match));
+        verify(notificationService, org.mockito.Mockito.times(2)).notifyChatReady(
+                org.mockito.ArgumentMatchers.any(User.class), org.mockito.ArgumentMatchers.same(chat));
     }
 
     @Test

@@ -18,6 +18,7 @@ public record MatchingProperties(
         @Positive long routeOverlapToleranceMeters,
         @DecimalMin("0.0") @DecimalMax("1.0") double minimumRouteOverlap,
         @DecimalMin("0.0") @DecimalMax("1.0") double minimumMatchScore,
+        @Positive int maximumResultsPerRide,
         @Positive double pickupWeight,
         @Positive double destinationWeight,
         @Positive double routeOverlapWeight,

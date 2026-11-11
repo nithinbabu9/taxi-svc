@@ -31,13 +31,16 @@ public class ChatService {
     private final ChatParticipantRepository participantRepository;
     private final MessageRepository messageRepository;
     private final UserService userService;
+    private final NotificationService notificationService;
 
     public ChatService(ChatRepository chatRepository, ChatParticipantRepository participantRepository,
-                       MessageRepository messageRepository, UserService userService) {
+                       MessageRepository messageRepository, UserService userService,
+                       NotificationService notificationService) {
         this.chatRepository = chatRepository;
         this.participantRepository = participantRepository;
         this.messageRepository = messageRepository;
         this.userService = userService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -74,6 +77,10 @@ public class ChatService {
         Chat chat = requireParticipant(actorId, findChat(chatId));
         User sender = userService.findEntity(actorId);
         Message message = messageRepository.save(new Message(chat, sender, request.message().trim()));
+        participantRepository.findByChatIdOrderByCreatedAtAsc(chatId).stream()
+                .map(ChatParticipant::getUser)
+                .filter(participant -> !participant.getId().equals(actorId))
+                .forEach(recipient -> notificationService.notifyNewMessage(recipient, message));
         log.info("Message sent with id {} in chat {}", message.getId(), chatId);
         return toMessageResponse(message);
     }

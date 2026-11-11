@@ -1,6 +1,9 @@
 package uber.taxi.controller;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,5 +29,13 @@ public class LocationController {
         return mapsClient.autocomplete(input.strip()).stream()
                 .map(suggestion -> new LocationSuggestionResponse(suggestion.placeId(), suggestion.description()))
                 .toList();
+    }
+
+    @GetMapping("/current")
+    public LocationSuggestionResponse currentLocation(
+            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") BigDecimal latitude,
+            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") BigDecimal longitude) {
+        var location = mapsClient.reverseGeocode(latitude, longitude);
+        return new LocationSuggestionResponse(location.placeId(), location.formattedAddress());
     }
 }

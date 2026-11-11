@@ -2,6 +2,7 @@ package uber.taxi.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import uber.taxi.util.GeoDistanceCalculator;
@@ -41,5 +42,13 @@ class LocalMapsClientTest {
                 .singleElement()
                 .extracting(PlaceSuggestion::description)
                 .isEqualTo("schaumburg, il");
+    }
+
+    @Test
+    void resolvesCurrentCoordinatesToANearbyLocalAddress() {
+        GeocodedLocation location = client.reverseGeocode(
+                new BigDecimal("42.0334"), new BigDecimal("-88.0834"));
+
+        assertThat(location.formattedAddress()).isEqualTo("schaumburg, il");
     }
 }

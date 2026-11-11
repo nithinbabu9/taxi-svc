@@ -78,12 +78,18 @@ public class RideMatchingService {
         if (!ride.getUser().getId().equals(actorId)) {
             throw new ForbiddenException("You do not own this ride request");
         }
-        return matchRepository.findAllForRide(rideId).stream().map(matchMapper::toResponse).toList();
+        return matchRepository.findAllForRide(rideId).stream()
+                .limit(properties.maximumResultsPerRide())
+                .map(matchMapper::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<RideMatchResponse> getForUser(UUID userId) {
-        return matchRepository.findAllForUser(userId).stream().map(matchMapper::toResponse).toList();
+        return matchRepository.findAllForUser(userId).stream()
+                .limit(properties.maximumResultsPerRide())
+                .map(matchMapper::toResponse)
+                .toList();
     }
 
     @Transactional

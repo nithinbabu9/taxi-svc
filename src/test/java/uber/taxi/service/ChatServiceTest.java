@@ -36,12 +36,14 @@ class ChatServiceTest {
     @Mock private ChatParticipantRepository participantRepository;
     @Mock private MessageRepository messageRepository;
     @Mock private UserService userService;
+    @Mock private NotificationService notificationService;
 
     private ChatService service;
 
     @BeforeEach
     void setUp() {
-        service = new ChatService(chatRepository, participantRepository, messageRepository, userService);
+        service = new ChatService(chatRepository, participantRepository, messageRepository, userService,
+                notificationService);
     }
 
     @Test
@@ -109,6 +111,7 @@ class ChatServiceTest {
         when(chatRepository.findById(chatId)).thenReturn(Optional.of(chat));
         when(userService.findEntity(senderId)).thenReturn(sender);
         when(participantRepository.existsByChatIdAndUserId(chatId, senderId)).thenReturn(true);
+        when(participantRepository.findByChatIdOrderByCreatedAtAsc(chatId)).thenReturn(java.util.List.of());
         when(messageRepository.save(any(Message.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.sendMessage(senderId, chatId, new SendMessageRequest("  Ready to leave?  "));

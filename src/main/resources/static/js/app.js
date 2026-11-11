@@ -5,11 +5,14 @@ let authMode = 'login';
 let rides = [];
 let matches = [];
 let chats = [];
+let notifications = [];
 let activeChatId = null;
 let verificationEmail = null;
 let passwordResetEmail = null;
 const autocompleteTimers = new Map();
 const autocompleteControllers = new Map();
+let notificationPollTimer = null;
+let knownNotificationIds = null;
 
 function persist() { localStorage.setItem(sessionKey, JSON.stringify(state)); }
 function clearSession() { Object.keys(state).forEach(key => delete state[key]); localStorage.removeItem(sessionKey); }
@@ -65,8 +68,8 @@ function hidePasswordReset() {
   $('forgotPasswordForm').classList.add('hidden'); $('resetPasswordForm').classList.add('hidden');
   $('authForm').classList.remove('hidden'); $('authSwitch').classList.remove('hidden'); $('authFoot').classList.remove('hidden'); setAuthMode('login');
 }
-function showPublic() { $('publicView').classList.remove('hidden'); $('appView').classList.add('hidden'); }
-function showApp() { $('publicView').classList.add('hidden'); $('appView').classList.remove('hidden'); renderProfile(); refreshDashboard(); }
+function showPublic() { $('publicView').classList.remove('hidden'); $('appView').classList.add('hidden'); stopNotificationPolling(); }
+function showApp() { $('publicView').classList.add('hidden'); $('appView').classList.remove('hidden'); renderProfile(); refreshDashboard(); startNotificationPolling(); }
 function renderProfile() {
   const name = state.user?.firstName || 'Traveler'; const fullName = `${state.user?.firstName || ''} ${state.user?.lastName || ''}`.trim() || 'My profile';
   $('profileInitial').textContent = name[0].toUpperCase(); $('profileName').textContent = fullName; $('welcomeName').textContent = `${name.toLowerCase()}.`;
@@ -74,7 +77,7 @@ function renderProfile() {
 function checkHealth() { api('/actuator/health', { headers: {} }).then(() => { $('apiStatus').textContent = 'Connected'; $('apiStatus').className = 'connection online'; }).catch(() => { $('apiStatus').textContent = 'API offline'; $('apiStatus').className = 'connection offline'; }); }
 async function refreshDashboard() {
   try {
-    [rides, matches, chats] = await Promise.all([api('/api/rides/mine'), api('/api/matches/mine'), api('/api/chats/mine')]);
+    [rides, matches, chats, notifications] = await Promise.all([api('/api/rides/mine'), api('/api/matches/mine'), api('/api/chats/mine'), api('/api/notifications')]);
     renderDashboard();
   } catch (error) {
     if (error.status === 401) { clearSession(); showPublic(); toast('Your session expired. Please log in again.', true); return; }
@@ -85,7 +88,41 @@ function renderDashboard() {
   $('openRideCount').textContent = rides.filter(ride => ride.status === 'OPEN').length;
   $('pendingMatchCount').textContent = matches.filter(match => match.status === 'PENDING').length;
   $('chatCount').textContent = chats.length;
-  renderRides(); renderMatches(); renderChats();
+  renderRides(); renderMatches(); renderChats(); renderNotifications();
+}
+function renderNotifications() {
+  const unread = notifications.filter(notification => !notification.readAt);
+  const badge = $('notificationBadge'); badge.textContent = unread.length > 9 ? '9+' : unread.length; badge.classList.toggle('hidden', unread.length === 0);
+  const container = $('notificationsList');
+  if (!notifications.length) { container.innerHTML = '<div class="empty-card">You’re all caught up.</div>'; return; }
+  container.innerHTML = notifications.map(notification => `<button class="notification-item ${notification.readAt ? '' : 'unread'}" type="button" data-notification-id="${notification.id}" data-notification-chat="${notification.chatId || ''}" data-notification-match="${notification.rideMatchId || ''}"><strong>${escapeHtml(notification.title)}</strong><span>${escapeHtml(notification.body)}</span><time>${formatDate(notification.createdAt)}</time></button>`).join('');
+  container.querySelectorAll('[data-notification-id]').forEach(button => button.addEventListener('click', () => openNotification(button)));
+}
+async function refreshNotifications() {
+  if (!state.token) return;
+  try {
+    const latest = await api('/api/notifications');
+    if (knownNotificationIds) {
+      const fresh = latest.find(notification => !knownNotificationIds.has(notification.id));
+      if (fresh) toast(fresh.title);
+    }
+    notifications = latest; knownNotificationIds = new Set(latest.map(notification => notification.id)); renderNotifications();
+  } catch (error) { if (error.status === 401) { clearSession(); showPublic(); } }
+}
+function startNotificationPolling() { if (notificationPollTimer) return; notificationPollTimer = setInterval(refreshNotifications, 20000); }
+function stopNotificationPolling() { if (notificationPollTimer) clearInterval(notificationPollTimer); notificationPollTimer = null; knownNotificationIds = null; }
+async function toggleNotifications() {
+  const panel = $('notificationsPanel'); const opening = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden', !opening); $('notificationsButton').setAttribute('aria-expanded', String(opening));
+  if (opening) { try { await api('/api/notifications/read-all', { method: 'POST' }); await refreshNotifications(); } catch (error) { toast(error.message, true); } }
+}
+async function openNotification(button) {
+  const notificationId = button.dataset.notificationId;
+  try { await api(`/api/notifications/${notificationId}/read`, { method: 'POST' }); } catch (error) { toast(error.message, true); return; }
+  $('notificationsPanel').classList.add('hidden'); $('notificationsButton').setAttribute('aria-expanded', 'false');
+  if (button.dataset.notificationChat) await openChat(button.dataset.notificationChat);
+  else if (button.dataset.notificationMatch) location.hash = 'matches';
+  await refreshNotifications();
 }
 function renderRides() {
   const container = $('ridesList');
@@ -113,6 +150,24 @@ async function createRide(event) {
   button.disabled = true; button.innerHTML = 'Resolving your route…';
   try { data.departureTime = new Date(data.departureTime).toISOString(); await api('/api/rides', { method: 'POST', body: JSON.stringify(data) }); $('rideForm').reset(); $('departureTime').value = defaultDeparture(); await refreshDashboard(); toast('Your ride is live. We’re checking compatible routes.'); }
   catch (error) { toast(error.message, true); } finally { button.disabled = false; button.innerHTML = 'Find compatible rides <span>→</span>'; }
+}
+async function useCurrentLocation() {
+  if (!navigator.geolocation) { toast('This browser does not support location access.', true); return; }
+  const button = $('useCurrentLocation'); button.disabled = true; button.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(async position => {
+    try {
+      const { latitude, longitude } = position.coords;
+      const location = await api(`/api/locations/current?latitude=${encodeURIComponent(latitude)}&longitude=${encodeURIComponent(longitude)}`);
+      $('pickupAddress').value = location.description;
+      toast('Your current location is set as pickup.');
+    } catch (error) { toast(error.message || 'Unable to resolve your current location.', true); }
+    finally { button.disabled = false; button.textContent = '⌖ Use my current location'; }
+  }, error => {
+    const message = error.code === error.PERMISSION_DENIED
+      ? 'Location permission was denied. You can still enter a pickup address.'
+      : 'Unable to get your current location. Please try again or enter an address.';
+    toast(message, true); button.disabled = false; button.textContent = '⌖ Use my current location';
+  }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
 }
 function hideSuggestions(container) { container.classList.add('hidden'); container.innerHTML = ''; }
 function configureAddressAutocomplete(inputId, suggestionsId) {
@@ -210,6 +265,6 @@ async function resetPassword(event) {
 
 $('loginTab').addEventListener('click', () => setAuthMode('login')); $('registerTab').addEventListener('click', () => setAuthMode('register'));
 $('passwordToggle').addEventListener('click', () => { const input = $('passwordInput'); const showing = input.type === 'text'; input.type = showing ? 'password' : 'text'; $('passwordToggle').setAttribute('aria-label', showing ? 'Show password' : 'Hide password'); });
-$('authForm').addEventListener('submit', authenticate); $('verificationForm').addEventListener('submit', verifyEmail); $('resendButton').addEventListener('click', resendVerification); $('backToAuthButton').addEventListener('click', hideVerification); $('forgotPasswordButton').addEventListener('click', showForgotPassword); $('forgotPasswordForm').addEventListener('submit', requestPasswordReset); $('resetPasswordForm').addEventListener('submit', resetPassword); $('backFromForgotButton').addEventListener('click', hidePasswordReset); $('backFromResetButton').addEventListener('click', hidePasswordReset); $('rideForm').addEventListener('submit', createRide); $('refreshRides').addEventListener('click', refreshDashboard); $('refreshMatches').addEventListener('click', refreshDashboard); $('refreshChats').addEventListener('click', refreshDashboard); $('messageForm').addEventListener('submit', sendMessage); $('closeChat').addEventListener('click', () => $('chatDialog').close()); $('logoutButton').addEventListener('click', () => { clearSession(); showPublic(); setAuthMode('login'); toast('You have been logged out.'); });
+$('authForm').addEventListener('submit', authenticate); $('verificationForm').addEventListener('submit', verifyEmail); $('resendButton').addEventListener('click', resendVerification); $('backToAuthButton').addEventListener('click', hideVerification); $('forgotPasswordButton').addEventListener('click', showForgotPassword); $('forgotPasswordForm').addEventListener('submit', requestPasswordReset); $('resetPasswordForm').addEventListener('submit', resetPassword); $('backFromForgotButton').addEventListener('click', hidePasswordReset); $('backFromResetButton').addEventListener('click', hidePasswordReset); $('rideForm').addEventListener('submit', createRide); $('useCurrentLocation').addEventListener('click', useCurrentLocation); $('refreshRides').addEventListener('click', refreshDashboard); $('refreshMatches').addEventListener('click', refreshDashboard); $('refreshChats').addEventListener('click', refreshDashboard); $('notificationsButton').addEventListener('click', toggleNotifications); $('closeNotifications').addEventListener('click', () => { $('notificationsPanel').classList.add('hidden'); $('notificationsButton').setAttribute('aria-expanded', 'false'); }); $('messageForm').addEventListener('submit', sendMessage); $('closeChat').addEventListener('click', () => $('chatDialog').close()); $('logoutButton').addEventListener('click', () => { clearSession(); showPublic(); setAuthMode('login'); toast('You have been logged out.'); });
 $('pickupAddress') && configureAddressAutocomplete('pickupAddress', 'pickupSuggestions'); $('destinationAddress') && configureAddressAutocomplete('destinationAddress', 'destinationSuggestions');
 $('departureTime').value = defaultDeparture(); checkHealth(); if (state.token && state.user) showApp(); else showPublic();

@@ -16,6 +16,7 @@ tags:
   - name: Matches
   - name: Chats
   - name: Locations
+  - name: Notifications
 paths:
   /api/auth/register:
     post:
@@ -113,6 +114,38 @@ paths:
       responses:
         '200': {description: Up to five address suggestions, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/LocationSuggestionResponse'}}}}}
         '400': {$ref: '#/components/responses/BadRequest'}
+  /api/locations/current:
+    get:
+      tags: [Locations]
+      summary: Resolve the authenticated traveler's current browser location to an address
+      parameters:
+        - {name: latitude, in: query, required: true, schema: {type: number, minimum: -90, maximum: 90}}
+        - {name: longitude, in: query, required: true, schema: {type: number, minimum: -180, maximum: 180}}
+      responses:
+        '200': {description: Current location address, content: {application/json: {schema: {$ref: '#/components/schemas/LocationSuggestionResponse'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List my 30 most recent in-app notifications
+      responses:
+        '200': {description: Notification list, content: {application/json: {schema: {type: array, items: {$ref: '#/components/schemas/NotificationResponse'}}}}}
+  /api/notifications/read-all:
+    post:
+      tags: [Notifications]
+      summary: Mark my recent notifications as read
+      responses:
+        '200': {description: Notifications marked read}
+  /api/notifications/{notificationId}/read:
+    post:
+      tags: [Notifications]
+      summary: Mark one of my notifications as read
+      parameters:
+        - {name: notificationId, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Notification marked read}
+        '403': {description: Notification belongs to another traveler}
+        '404': {description: Notification not found}
   /api/rides:
     get:
       tags: [Rides]
@@ -310,6 +343,17 @@ components:
       properties:
         placeId: {type: string, description: Google place identifier}
         description: {type: string, example: 'Millennium Park, 201 E Randolph St, Chicago, IL 60602, USA'}
+    NotificationResponse:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        type: {type: string, enum: [MATCH_ACCEPTED, CHAT_READY, NEW_MESSAGE]}
+        title: {type: string}
+        body: {type: string}
+        chatId: {type: [string, 'null'], format: uuid}
+        rideMatchId: {type: [string, 'null'], format: uuid}
+        readAt: {type: [string, 'null'], format: date-time}
+        createdAt: {type: string, format: date-time}
     CreateRideRequest:
       type: object
       required: [pickupAddress, destinationAddress, departureTime]

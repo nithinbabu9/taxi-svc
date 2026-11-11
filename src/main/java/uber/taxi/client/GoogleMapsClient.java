@@ -108,6 +108,33 @@ public class GoogleMapsClient implements MapsClient {
     }
 
     @Override
+    public GeocodedLocation reverseGeocode(BigDecimal latitude, BigDecimal longitude) {
+        try {
+            GeocodeResponse response = geocodingClient.get()
+                    .uri("/v4/geocode/location/" + latitude.toPlainString() + "," + longitude.toPlainString())
+                    .header(API_KEY_HEADER, properties.apiKey())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(GeocodeResponse.class);
+            if (response == null || response.results() == null || response.results().isEmpty()) {
+                throw new InvalidLocationException("No address found for your current location");
+            }
+            GeocodeResult result = response.results().getFirst();
+            if (result.location() == null || result.formattedAddress() == null) {
+                throw new InvalidLocationException("Google returned an incomplete location result");
+            }
+            return new GeocodedLocation(result.formattedAddress(), result.placeId(),
+                    result.location().latitude(), result.location().longitude());
+        } catch (RestClientResponseException exception) {
+            throw mapHttpFailure("reverse geocoding", exception);
+        } catch (ResourceAccessException exception) {
+            throw unavailable("Google reverse geocoding timed out or could not be reached", exception);
+        } catch (RestClientException exception) {
+            throw malformed("Google returned a malformed reverse geocoding response", exception);
+        }
+    }
+
+    @Override
     public RouteDetails computeDrivingRoute(GeocodedLocation origin, GeocodedLocation destination,
                                              Instant departureTime) {
         RouteRequest request = new RouteRequest(

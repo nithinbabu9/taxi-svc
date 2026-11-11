@@ -70,6 +70,21 @@ class GoogleMapsClientTest {
     }
 
     @Test
+    void reverseGeocodesCurrentCoordinates() {
+        geocodingServer.expect(requestTo("https://geocode.test/v4/geocode/location/42.0334,-88.0834"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Goog-Api-Key", "maps-key"))
+                .andRespond(withSuccess("""
+                        {"results":[{"placeId":"place-current","formattedAddress":"Schaumburg, IL, USA","location":{"latitude":42.0334,"longitude":-88.0834}}]}
+                        """, MediaType.APPLICATION_JSON));
+
+        GeocodedLocation result = client.reverseGeocode(new BigDecimal("42.0334"), new BigDecimal("-88.0834"));
+
+        assertEquals("Schaumburg, IL, USA", result.formattedAddress());
+        geocodingServer.verify();
+    }
+
+    @Test
     void mapsQuotaFailureWithoutExposingResponseBody() {
         geocodingServer.expect(requestTo("https://geocode.test/v4/geocode/address/address"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));

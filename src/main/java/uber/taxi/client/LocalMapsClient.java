@@ -63,6 +63,18 @@ public class LocalMapsClient implements MapsClient {
     }
 
     @Override
+    public GeocodedLocation reverseGeocode(BigDecimal latitude, BigDecimal longitude) {
+        Coordinates requested = new Coordinates(latitude.doubleValue(), longitude.doubleValue());
+        String nearestAddress = KNOWN_LOCATIONS.entrySet().stream()
+                .min(java.util.Comparator.comparingDouble(entry -> distanceCalculator.between(
+                        new GeoPoint(requested.latitude(), requested.longitude()),
+                        new GeoPoint(entry.getValue().latitude(), entry.getValue().longitude()))))
+                .map(Map.Entry::getKey)
+                .orElse("Current location");
+        return new GeocodedLocation(nearestAddress, "local-current-location", latitude, longitude);
+    }
+
+    @Override
     public RouteDetails computeDrivingRoute(GeocodedLocation origin, GeocodedLocation destination,
                                              Instant departureTime) {
         double directDistance = distanceCalculator.between(

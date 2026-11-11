@@ -56,15 +56,16 @@ app:
     connect-timeout: 3s
     read-timeout: 8s
   matching:
-    # 50 miles: a broad candidate radius. Route, destination, and departure-time scoring
-    # still decide whether two nearby riders are genuinely compatible.
-    maximum-pickup-deviation-meters: 80467
+    # Route quality, destination proximity, and departure time determine eligibility.
+    # Results shown to each traveler are limited to their five highest-scoring matches.
+    maximum-pickup-deviation-meters: 16000
     maximum-destination-deviation-meters: 10000
-    maximum-route-pickup-deviation-meters: 80467
+    maximum-route-pickup-deviation-meters: 16000
     maximum-departure-time-difference: 30m
     route-overlap-tolerance-meters: 2000
     minimum-route-overlap: 0.25
     minimum-match-score: 0.55
+    maximum-results-per-ride: 5
     pickup-weight: 0.25
     destination-weight: 0.30
     route-overlap-weight: 0.30

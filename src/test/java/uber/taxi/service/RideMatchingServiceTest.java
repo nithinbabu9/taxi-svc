@@ -45,7 +45,7 @@ class RideMatchingServiceTest {
     @BeforeEach
     void setUp() {
         MatchingProperties properties = new MatchingProperties(10_000, 10_000, 5_000,
-                Duration.ofMinutes(30), 2_000, 0.25, 0.55, 0.25, 0.30, 0.30, 0.15);
+                Duration.ofMinutes(30), 2_000, 0.25, 0.55, 5, 0.25, 0.30, 0.30, 0.15);
         GeoDistanceCalculator distanceCalculator = new GeoDistanceCalculator();
         service = new RideMatchingService(rideRepository, matchRepository, properties, new PolylineDecoder(),
                 distanceCalculator, new RouteSimilarityCalculator(distanceCalculator), new RideMatchMapper());

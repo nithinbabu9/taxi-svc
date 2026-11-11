@@ -122,8 +122,10 @@ duration, and overview encoded polyline. Flyway applies the database schema migr
 
 Creating a ride automatically evaluates other users' open rides within the configured
 departure-time window. Matching uses direct pickup proximity, pickup-to-route proximity,
-destination proximity, decoded-polyline overlap, and departure-time difference. Retrieve
-ranked results with:
+destination proximity, decoded-polyline overlap, and departure-time difference. The API and UI
+return the five highest-scoring compatible matches rather than using a displayed fixed-mile radius.
+The pickup form can also use the browser's current location (with the traveler's permission) and
+reverse-geocode it through the backend. Retrieve ranked results with:
 
 ```text
 GET /api/rides/{rideId}/matches
@@ -166,11 +168,18 @@ The second acceptance atomically marks the match and rides as matched, cancels c
 pending matches, creates one chat, and adds both users as participants. Match rows are
 locked during decisions, and database uniqueness constraints prevent duplicate chats.
 
+The recipient receives a persisted in-app notification when a traveler accepts a match, when a
+chat becomes ready, and when the other chat participant sends a message. The web UI polls the
+notification endpoint every 20 seconds; WebSocket push can be added later without changing the
+notification data model.
+
 ```text
 GET  /api/chats/mine
 GET  /api/chats/{chatId}
 GET  /api/chats/{chatId}/messages?page=0&size=50
 POST /api/chats/{chatId}/messages
+GET  /api/notifications
+POST /api/notifications/read-all
 
 {"message":"See you at the pickup point"}
 ```
